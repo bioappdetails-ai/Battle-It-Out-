@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import colors from '../config/colors';
-import fonts from '../config/fonts';
+import colors from '../../config/colors';
+import fonts from '../../config/fonts';
 
 const ProfileScreen = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState('Battles');
@@ -89,7 +89,7 @@ const ProfileScreen = ({ navigation }) => {
         <View style={styles.profileImageContainerBg}>
           <View style={styles.profileImageContainer}>
             <Image
-              source={require("../assets/profile.jpg")}
+              source={require("../../assets/profile.jpg")}
               style={styles.profileImage}
             />
           </View>
@@ -132,19 +132,23 @@ const ProfileScreen = ({ navigation }) => {
         {/* Action Buttons */}
         <View style={styles.actionButtons}>
           <TouchableOpacity
-            style={[
-              styles.actionButton,
-              activeTab === "Battles" && styles.actionButtonActive,
-            ]}
+            style={styles.actionButton}
             onPress={() => setActiveTab("Battles")}
           >
-            <Ionicons
-              name="trophy"
-              size={20}
-              color={
-                activeTab === "Battles" ? colors.primary : colors.textSecondary
-              }
-            />
+            <View
+              style={[
+                styles.actionIconContainer,
+                activeTab === "Battles"
+                  ? styles.actionIconContainerActive
+                  : styles.actionIconContainerInactive,
+              ]}
+            >
+              <Ionicons
+                name="trophy"
+                size={20}
+                color={colors.textLight}
+              />
+            </View>
             <Text
               style={[
                 styles.actionButtonText,
@@ -156,19 +160,23 @@ const ProfileScreen = ({ navigation }) => {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[
-              styles.actionButton,
-              activeTab === "Archive" && styles.actionButtonActive,
-            ]}
+            style={styles.actionButton}
             onPress={() => setActiveTab("Archive")}
           >
-            <Ionicons
-              name="archive-outline"
-              size={20}
-              color={
-                activeTab === "Archive" ? colors.primary : colors.textSecondary
-              }
-            />
+            <View
+              style={[
+                styles.actionIconContainer,
+                activeTab === "Archive"
+                  ? styles.actionIconContainerActive
+                  : styles.actionIconContainerInactive,
+              ]}
+            >
+              <Ionicons
+                name="archive-outline"
+                size={20}
+                color={colors.textLight}
+              />
+            </View>
             <Text
               style={[
                 styles.actionButtonText,
@@ -180,19 +188,23 @@ const ProfileScreen = ({ navigation }) => {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[
-              styles.actionButton,
-              activeTab === "Saved" && styles.actionButtonActive,
-            ]}
+            style={styles.actionButton}
             onPress={() => setActiveTab("Saved")}
           >
-            <Ionicons
-              name="bookmark-outline"
-              size={20}
-              color={
-                activeTab === "Saved" ? colors.primary : colors.textSecondary
-              }
-            />
+            <View
+              style={[
+                styles.actionIconContainer,
+                activeTab === "Saved"
+                  ? styles.actionIconContainerActive
+                  : styles.actionIconContainerInactive,
+              ]}
+            >
+              <Ionicons
+                name="bookmark-outline"
+                size={20}
+                color={colors.textLight}
+              />
+            </View>
             <Text
               style={[
                 styles.actionButtonText,
@@ -339,7 +351,7 @@ const styles = StyleSheet.create({
   actionButtons: {
     flexDirection: "row",
     justifyContent: "space-around",
-    paddingHorizontal: 20,
+    paddingHorizontal: 5,
     paddingVertical: 20,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
@@ -348,20 +360,31 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     borderRadius: 8,
   },
-  actionButtonActive: {
-    backgroundColor: colors.light,
+  actionIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  actionIconContainerActive: {
+    backgroundColor: colors.secondary,
+  },
+  actionIconContainerInactive: {
+    backgroundColor: "#000000",
   },
   actionButtonText: {
-    fontSize: 14,
+    fontSize: 12,
     fontFamily: fonts.medium,
-    color: colors.textSecondary,
+    color: "#000000",
     marginLeft: 8,
   },
   actionButtonTextActive: {
-    color: colors.primary,
+    color: colors.secondary,
+    fontFamily: fonts.semiBold,
   },
   videoGrid: {
     paddingHorizontal: 20,
@@ -392,4 +415,5 @@ const styles = StyleSheet.create({
 });
 
 export default ProfileScreen;
+
 

@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
-import colors from '../config/colors';
-import fonts from '../config/fonts';
-import CustomTextInput from '../components/CustomTextInput';
-import PasswordInput from '../components/PasswordInput';
-import CustomButton from '../components/CustomButton';
-import SocialButton from '../components/SocialButton';
-import Checkbox from '../components/Checkbox';
+import colors from '../../config/colors';
+import fonts from '../../config/fonts';
+import CustomTextInput from '../../components/CustomTextInput';
+import PasswordInput from '../../components/PasswordInput';
+import CustomButton from '../../components/CustomButton';
+import SocialButton from '../../components/SocialButton';
+import Checkbox from '../../components/Checkbox';
 
 const SignupScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -54,7 +54,7 @@ const SignupScreen = ({ navigation }) => {
       >
         {/* Logo */}
         <Image
-          source={require('../assets/logo.png')}
+          source={require('../../assets/logo.png')}
           style={styles.logo}
           resizeMode="contain"
         />
@@ -70,7 +70,7 @@ const SignupScreen = ({ navigation }) => {
           <SocialButton
             icon={
               <Image
-                source={require('../assets/google.png')}
+                source={require('../../assets/google.png')}
                 style={styles.socialIcon}
                 resizeMode="contain"
               />
@@ -83,7 +83,7 @@ const SignupScreen = ({ navigation }) => {
           <SocialButton
             icon={
               <Image
-                source={require('../assets/fb.png')}
+                source={require('../../assets/fb.png')}
                 style={styles.socialIcon}
                 resizeMode="contain"
               />

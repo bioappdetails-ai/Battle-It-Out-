@@ -7,26 +7,35 @@ import colors from '../config/colors';
 import fonts from '../config/fonts';
 
 // Auth Screens
-import SplashScreen from '../screens/SplashScreen';
-import LoginScreen from '../screens/LoginScreen';
-import SignupScreen from '../screens/SignupScreen';
-import VerificationScreen from '../screens/VerificationScreen';
-import ProfileCreationScreen from '../screens/ProfileCreationScreen';
+import SplashScreen from '../screens/auth/SplashScreen';
+import LoginScreen from '../screens/auth/LoginScreen';
+import SignupScreen from '../screens/auth/SignupScreen';
+import VerificationScreen from '../screens/auth/VerificationScreen';
+import ProfileCreationScreen from '../screens/auth/ProfileCreationScreen';
 
 // Main App Screens
-import HomeScreen from '../screens/HomeScreen';
-import DiscoverScreen from '../screens/DiscoverScreen';
-import BattlesScreen from '../screens/BattlesScreen';
-import ProfileScreen from '../screens/ProfileScreen';
-import MessagesScreen from '../screens/MessagesScreen';
-import SettingsScreen from '../screens/SettingsScreen';
-import SecurityScreen from '../screens/SecurityScreen';
-import BlockAccountScreen from '../screens/BlockAccountScreen';
-import UpdatePasswordScreen from '../screens/UpdatePasswordScreen';
-import UpdateEmailScreen from '../screens/UpdateEmailScreen';
-import UpdatePasswordVerificationScreen from '../screens/UpdatePasswordVerificationScreen';
-import UpdateEmailVerificationScreen from '../screens/UpdateEmailVerificationScreen';
-import UpdateProfileScreen from '../screens/UpdateProfileScreen';
+import HomeScreen from '../screens/main/HomeScreen';
+import DiscoverScreen from '../screens/main/DiscoverScreen';
+import BattlesScreen from '../screens/main/BattlesScreen';
+import BattleUploadScreen from '../screens/main/BattleUploadScreen';
+import ProfileScreen from '../screens/main/ProfileScreen';
+import InboxScreen from '../screens/main/InboxScreen';
+import MessageDetailsScreen from '../screens/main/MessageDetailsScreen';
+import UserProfileScreen from '../screens/main/UserProfileScreen';
+import ChallengeScreen from '../screens/main/ChallengeScreen';
+import BattleViewScreen from '../screens/main/BattleViewScreen';
+
+// Settings Screens
+import SettingsScreen from '../screens/settings/SettingsScreen';
+import SecurityScreen from '../screens/settings/SecurityScreen';
+import BlockAccountScreen from '../screens/settings/BlockAccountScreen';
+import UpdateProfileScreen from '../screens/settings/UpdateProfileScreen';
+
+// Security Screens
+import UpdatePasswordScreen from '../screens/security/UpdatePasswordScreen';
+import UpdateEmailScreen from '../screens/security/UpdateEmailScreen';
+import UpdatePasswordVerificationScreen from '../screens/security/UpdatePasswordVerificationScreen';
+import UpdateEmailVerificationScreen from '../screens/security/UpdateEmailVerificationScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -94,7 +103,7 @@ const MainTabs = () => {
       />
       <Tab.Screen
         name="Add"
-        component={BattlesScreen}
+        component={BattleUploadScreen}
         options={{
           tabBarLabel: "",
           tabBarIcon: ({ focused }) => (
@@ -173,7 +182,11 @@ const AppNavigator = () => {
         
         {/* Main App */}
         <Stack.Screen name="Main" component={MainTabs} />
-        <Stack.Screen name="Messages" component={MessagesScreen} />
+        <Stack.Screen name="Inbox" component={InboxScreen} />
+        <Stack.Screen name="MessageDetails" component={MessageDetailsScreen} />
+        <Stack.Screen name="UserProfile" component={UserProfileScreen} />
+        <Stack.Screen name="Challenge" component={ChallengeScreen} />
+        <Stack.Screen name="BattleView" component={BattleViewScreen} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="Security" component={SecurityScreen} />
         <Stack.Screen name="UpdatePassword" component={UpdatePasswordScreen} />

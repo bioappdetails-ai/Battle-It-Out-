@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import colors from '../config/colors';
-import fonts from '../config/fonts';
-import CustomTextInput from '../components/CustomTextInput';
-import CustomButton from '../components/CustomButton';
+import colors from '../../config/colors';
+import fonts from '../../config/fonts';
+import CustomTextInput from '../../components/CustomTextInput';
+import CustomButton from '../../components/CustomButton';
+import CustomHeader from '../../components/CustomHeader';
 
 const UpdateEmailScreen = ({ navigation }) => {
   const [currentEmail, setCurrentEmail] = useState('');
@@ -40,16 +41,10 @@ const UpdateEmailScreen = ({ navigation }) => {
     >
       <View style={styles.container}>
         {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={styles.backButton}
-          >
-            <Ionicons name="arrow-back" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Update Email</Text>
-          <View style={styles.headerSpacer} />
-        </View>
+        <CustomHeader 
+          title="Update Email" 
+          navigation={navigation}
+        />
 
         <ScrollView
           showsVerticalScrollIndicator={false}
@@ -98,28 +93,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 15,
-  },
-  backButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontFamily: fonts.semiBold,
-    color: colors.text,
-    textAlign: "left",
-    flex: 1,
-    marginLeft: 12,
-  },
-  headerSpacer: {
-    width: 32,
   },
   scrollContent: {
     paddingHorizontal: 20,

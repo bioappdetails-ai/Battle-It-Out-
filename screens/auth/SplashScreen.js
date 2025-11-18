@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { View, Image, StyleSheet } from 'react-native';
-import colors from '../config/colors';
+import colors from '../../config/colors';
 
 const SplashScreen = ({ navigation }) => {
   useEffect(() => {
@@ -14,7 +14,7 @@ const SplashScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <Image 
-        source={require('../assets/splash icon.png')} 
+        source={require('../../assets/splash icon.png')} 
         style={styles.logo}
         resizeMode="cover"
       />

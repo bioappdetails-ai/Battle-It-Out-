@@ -1,12 +1,13 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import ProfileIcon from '../assets/settings/profile.svg';
-import SecuritySafeIcon from '../assets/settings/security-safe.svg';
-import ProfileDeleteIcon from '../assets/settings/profile-delete.svg';
-import LogoutIcon from '../assets/settings/logout.svg';
-import colors from '../config/colors';
-import fonts from '../config/fonts';
+import ProfileIcon from '../../assets/settings/profile.svg';
+import SecuritySafeIcon from '../../assets/settings/security-safe.svg';
+import ProfileDeleteIcon from '../../assets/settings/profile-delete.svg';
+import LogoutIcon from '../../assets/settings/logout.svg';
+import colors from '../../config/colors';
+import fonts from '../../config/fonts';
+import CustomHeader from '../../components/CustomHeader';
 
 const SettingsScreen = ({ navigation }) => {
   const handleEditProfile = () => {
@@ -56,16 +57,11 @@ const SettingsScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-        >
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Account Setting</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <CustomHeader 
+        title="Account Setting" 
+        navigation={navigation}
+        onBackPress={() => navigation.navigate('Main', { screen: 'Profile' })}
+      />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -121,28 +117,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 15,
-  },
-  backButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontFamily: fonts.semiBold,
-    color: colors.text,
-    textAlign: "left",
-    flex: 1,
-    marginLeft: 12,
-  },
-  headerSpacer: {
-    width: 32,
   },
   scrollContent: {
     paddingHorizontal: 20,

@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import colors from '../config/colors';
-import fonts from '../config/fonts';
-import CodeInput from '../components/CodeInput';
-import CustomButton from '../components/CustomButton';
+import colors from '../../config/colors';
+import fonts from '../../config/fonts';
+import CodeInput from '../../components/CodeInput';
+import CustomButton from '../../components/CustomButton';
+import CustomHeader from '../../components/CustomHeader';
 
 const UpdateEmailVerificationScreen = ({ navigation }) => {
   const [code, setCode] = useState('');
@@ -34,13 +35,11 @@ const UpdateEmailVerificationScreen = ({ navigation }) => {
         keyboardShouldPersistTaps="handled"
       >
         {/* Header with Back Button */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Verification Code</Text>
-          <View style={styles.headerSpacer} />
-        </View>
+        <CustomHeader 
+          title="Verification Code" 
+          navigation={navigation}
+          onBackPress={handleBack}
+        />
 
         {/* Subtitle */}
         <Text style={styles.subtitle}>
@@ -49,7 +48,7 @@ const UpdateEmailVerificationScreen = ({ navigation }) => {
 
         {/* Verification Image */}
         <Image
-          source={require('../assets/verification.png')}
+          source={require('../../assets/verification.png')}
           style={styles.verificationImage}
           resizeMode="contain"
         />
@@ -82,29 +81,8 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 20,
-    paddingTop: 60,
+    paddingTop: 20,
     paddingBottom: 40,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 16,
-    gap: 10,
-  },
-  backButton: {
-    padding: 8,
-    marginLeft: -8,
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: 24,
-    fontFamily: fonts.medium,
-    color: colors.text,
-    textAlign: "left",
-    marginLeft: 12,
-  },
-  headerSpacer: {
-    width: 40,
   },
   subtitle: {
     fontSize: 14,

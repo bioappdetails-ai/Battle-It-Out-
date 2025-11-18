@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import colors from '../config/colors';
-import fonts from '../config/fonts';
-import CustomTextInput from '../components/CustomTextInput';
-import CustomButton from '../components/CustomButton';
+import colors from '../../config/colors';
+import fonts from '../../config/fonts';
+import CustomTextInput from '../../components/CustomTextInput';
+import CustomButton from '../../components/CustomButton';
+import CustomHeader from '../../components/CustomHeader';
 
-const ProfileCreationScreen = ({ navigation }) => {
+const UpdateProfileScreen = ({ navigation }) => {
   const [profileImage, setProfileImage] = useState(null);
   const [displayName, setDisplayName] = useState('');
   const [userName, setUserName] = useState('');
@@ -38,7 +39,7 @@ const ProfileCreationScreen = ({ navigation }) => {
     }
   };
 
-  const handleComplete = () => {
+  const handleUpdate = () => {
     if (!displayName.trim()) {
       Alert.alert('Error', 'Please enter your display name');
       return;
@@ -52,14 +53,17 @@ const ProfileCreationScreen = ({ navigation }) => {
       return;
     }
 
-    // Handle profile creation logic here
-    console.log('Profile Created:', {
+    // Handle profile update logic here
+    console.log('Profile Updated:', {
       profileImage,
       displayName,
       userName,
       profession,
     });
-    navigation.replace('Main');
+    
+    Alert.alert('Success', 'Your profile has been updated successfully!', [
+      { text: 'OK', onPress: () => navigation.goBack() }
+    ]);
   };
 
   const handleBack = () => {
@@ -71,23 +75,21 @@ const ProfileCreationScreen = ({ navigation }) => {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
+      {/* Header with Back Button */}
+      <CustomHeader 
+        title="Edit Profile" 
+        navigation={navigation}
+        onBackPress={handleBack}
+      />
+      
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Header with Back Button */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Upload Your Bio</Text>
-          <View style={styles.headerSpacer} />
-        </View>
-
         {/* Subtitle */}
         <Text style={styles.subtitle}>
-          Complete your bio and challenge your friend to a battle.
+          Update your profile information and keep it up to date.
         </Text>
 
         {/* Profile Picture Section */}
@@ -134,11 +136,11 @@ const ProfileCreationScreen = ({ navigation }) => {
           />
         </View>
 
-        {/* Complete Button */}
+        {/* Update Button */}
         <CustomButton
-          text="Complete"
-          onPress={handleComplete}
-          style={styles.completeButton}
+          text="Update Profile"
+          onPress={handleUpdate}
+          style={styles.updateButton}
         />
       </ScrollView>
     </KeyboardAvoidingView>
@@ -153,28 +155,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 20,
-    paddingTop: 60,
     paddingBottom: 40,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  backButton: {
-    padding: 8,
-    marginLeft: -8,
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: 24,
-    fontFamily: fonts.medium,
-    color: colors.text,
-    textAlign: 'center',
-    marginRight: 40,
-  },
-  headerSpacer: {
-    width: 40,
   },
   subtitle: {
     fontSize: 14,
@@ -215,10 +196,10 @@ const styles = StyleSheet.create({
     width: '100%',
     marginBottom: 30,
   },
-  completeButton: {
+  updateButton: {
     backgroundColor: colors.primary,
   },
 });
 
-export default ProfileCreationScreen;
+export default UpdateProfileScreen;
 

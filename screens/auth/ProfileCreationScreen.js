@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import colors from '../config/colors';
-import fonts from '../config/fonts';
-import CustomTextInput from '../components/CustomTextInput';
-import CustomButton from '../components/CustomButton';
+import colors from '../../config/colors';
+import fonts from '../../config/fonts';
+import CustomTextInput from '../../components/CustomTextInput';
+import CustomButton from '../../components/CustomButton';
+import CustomHeader from '../../components/CustomHeader';
 
-const UpdateProfileScreen = ({ navigation }) => {
+const ProfileCreationScreen = ({ navigation }) => {
   const [profileImage, setProfileImage] = useState(null);
   const [displayName, setDisplayName] = useState('');
   const [userName, setUserName] = useState('');
@@ -38,7 +39,7 @@ const UpdateProfileScreen = ({ navigation }) => {
     }
   };
 
-  const handleUpdate = () => {
+  const handleComplete = () => {
     if (!displayName.trim()) {
       Alert.alert('Error', 'Please enter your display name');
       return;
@@ -52,17 +53,14 @@ const UpdateProfileScreen = ({ navigation }) => {
       return;
     }
 
-    // Handle profile update logic here
-    console.log('Profile Updated:', {
+    // Handle profile creation logic here
+    console.log('Profile Created:', {
       profileImage,
       displayName,
       userName,
       profession,
     });
-    
-    Alert.alert('Success', 'Your profile has been updated successfully!', [
-      { text: 'OK', onPress: () => navigation.goBack() }
-    ]);
+    navigation.replace('Main');
   };
 
   const handleBack = () => {
@@ -80,17 +78,15 @@ const UpdateProfileScreen = ({ navigation }) => {
         keyboardShouldPersistTaps="handled"
       >
         {/* Header with Back Button */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Edit Profile</Text>
-          <View style={styles.headerSpacer} />
-        </View>
+        <CustomHeader 
+          title="Upload Your Bio" 
+          navigation={navigation}
+          onBackPress={handleBack}
+        />
 
         {/* Subtitle */}
         <Text style={styles.subtitle}>
-          Update your profile information and keep it up to date.
+          Complete your bio and challenge your friend to a battle.
         </Text>
 
         {/* Profile Picture Section */}
@@ -137,11 +133,11 @@ const UpdateProfileScreen = ({ navigation }) => {
           />
         </View>
 
-        {/* Update Button */}
+        {/* Complete Button */}
         <CustomButton
-          text="Update Profile"
-          onPress={handleUpdate}
-          style={styles.updateButton}
+          text="Complete"
+          onPress={handleComplete}
+          style={styles.completeButton}
         />
       </ScrollView>
     </KeyboardAvoidingView>
@@ -156,28 +152,8 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 20,
-    paddingTop: 60,
+    paddingTop: 20,
     paddingBottom: 40,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  backButton: {
-    padding: 8,
-    marginLeft: -8,
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: 24,
-    fontFamily: fonts.medium,
-    color: colors.text,
-    textAlign: 'left',
-    marginLeft: 12,
-  },
-  headerSpacer: {
-    width: 40,
   },
   subtitle: {
     fontSize: 14,
@@ -218,10 +194,10 @@ const styles = StyleSheet.create({
     width: '100%',
     marginBottom: 30,
   },
-  updateButton: {
+  completeButton: {
     backgroundColor: colors.primary,
   },
 });
 
-export default UpdateProfileScreen;
+export default ProfileCreationScreen;
 
