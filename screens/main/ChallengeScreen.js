@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -7,44 +7,47 @@ import {
   TouchableOpacity,
   Image,
   KeyboardAvoidingView,
+  Dimensions,
   Platform,
   Alert,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
-import colors from '../../config/colors';
-import fonts from '../../config/fonts';
-import CustomHeader from '../../components/CustomHeader';
-import CustomTextInput from '../../components/CustomTextInput';
-import CustomButton from '../../components/CustomButton';
-import UploadSvg from '../../assets/upload.svg';
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
+import colors from "../../config/colors";
+import fonts from "../../config/fonts";
+import CustomHeader from "../../components/CustomHeader";
+import CustomTextInput from "../../components/CustomTextInput";
+import CustomButton from "../../components/CustomButton";
+import UploadSvg from "../../assets/upload.svg";
+
+const SECTION_HEIGHT = Dimensions.get("window").height * 0.3;
 
 const ChallengeScreen = ({ route, navigation }) => {
   const { post } = route.params || {};
   const [selectedVideo, setSelectedVideo] = useState(null);
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('Music');
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("Music");
 
   const categories = [
-    'Music',
-    'Singing',
-    'Writing',
-    'Art',
-    'Sports',
-    'Gym',
-    'Food',
-    'Traveling',
-    'Racing',
-    'Swimming',
+    "Music",
+    "Singing",
+    "Writing",
+    "Art",
+    "Sports",
+    "Gym",
+    "Food",
+    "Traveling",
+    "Racing",
+    "Swimming",
   ];
 
   const requestVideoPermission = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
+    if (status !== "granted") {
       Alert.alert(
-        'Permission Denied',
-        'Sorry, we need camera roll permissions to upload your video!'
+        "Permission Denied",
+        "Sorry, we need camera roll permissions to upload your video!"
       );
       return false;
     }
@@ -69,35 +72,35 @@ const ChallengeScreen = ({ route, navigation }) => {
 
   const handleUpload = () => {
     if (!selectedVideo) {
-      Alert.alert('Error', 'Please select a video to upload');
+      Alert.alert("Error", "Please select a video to upload");
       return;
     }
     if (!title.trim()) {
-      Alert.alert('Error', 'Please enter a title');
+      Alert.alert("Error", "Please enter a title");
       return;
     }
     if (!description.trim()) {
-      Alert.alert('Error', 'Please enter a description');
+      Alert.alert("Error", "Please enter a description");
       return;
     }
 
     // Handle upload logic here
-    console.log('Uploading challenge:', {
+    console.log("Uploading challenge:", {
       video: selectedVideo,
       title,
       description,
       category: selectedCategory,
     });
 
-    Alert.alert('Success', 'Challenge uploaded successfully!', [
-      { text: 'OK', onPress: () => navigation.navigate('Main') },
+    Alert.alert("Success", "Challenge uploaded successfully!", [
+      { text: "OK", onPress: () => navigation.navigate("Main") },
     ]);
   };
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <CustomHeader title="Challenge" navigation={navigation} />
 
@@ -118,7 +121,11 @@ const ChallengeScreen = ({ route, navigation }) => {
               />
             ) : (
               <View style={styles.challengedPlaceholder}>
-                <Ionicons name="image-outline" size={40} color={colors.textSecondary} />
+                <Ionicons
+                  name="image-outline"
+                  size={40}
+                  color={colors.textSecondary}
+                />
               </View>
             )}
           </View>
@@ -133,7 +140,11 @@ const ChallengeScreen = ({ route, navigation }) => {
                   resizeMode="cover"
                 />
                 <View style={styles.videoOverlay}>
-                  <Ionicons name="play-circle" size={32} color={colors.textLight} />
+                  <Ionicons
+                    name="play-circle"
+                    size={32}
+                    color={colors.textLight}
+                  />
                 </View>
                 <TouchableOpacity
                   style={styles.removeVideoButton}
@@ -156,15 +167,12 @@ const ChallengeScreen = ({ route, navigation }) => {
                   <Text style={styles.uploadText}>Upload Your Video</Text>
                   <Text style={styles.uploadFormats}>MP4, MOV, AVI</Text>
                 </View>
-              </TouchableOpacity>
-            )}
-
-            {!selectedVideo && (
-              <TouchableOpacity
-                style={styles.selectVideoButton}
-                onPress={pickVideo}
-              >
-                <Text style={styles.selectVideoButtonText}>Select Video</Text>
+                <TouchableOpacity
+                  style={styles.selectVideoButton}
+                  onPress={pickVideo}
+                >
+                  <Text style={styles.selectVideoButtonText}>Select Video</Text>
+                </TouchableOpacity>
               </TouchableOpacity>
             )}
           </View>
@@ -177,6 +185,7 @@ const ChallengeScreen = ({ route, navigation }) => {
             placeholder="Enter Title"
             value={title}
             onChangeText={setTitle}
+            labelStyle={styles.fieldLabel}
           />
 
           <CustomTextInput
@@ -187,6 +196,7 @@ const ChallengeScreen = ({ route, navigation }) => {
             multiline
             numberOfLines={4}
             textAlignVertical="top"
+            labelStyle={styles.fieldLabel}
           />
         </View>
 
@@ -242,52 +252,54 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   videoSection: {
-    flexDirection: 'row',
+    flexDirection: "row",
     marginBottom: 24,
+    borderRadius: 12,
   },
   challengedPostContainer: {
     flex: 1,
-    aspectRatio: 1,
+    height: SECTION_HEIGHT,
     borderRadius: 12,
-    overflow: 'hidden',
+    overflow: "hidden",
     backgroundColor: colors.itemBackground,
     marginRight: 12,
   },
   challengedThumbnail: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   challengedPlaceholder: {
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: "100%",
+    height: "100%",
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: colors.itemBackground,
   },
   uploadSection: {
     flex: 1,
-    aspectRatio: 1,
+    height: SECTION_HEIGHT,
   },
   uploadPlaceholderContainer: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
     borderWidth: 2,
     borderColor: colors.primary,
-    borderStyle: 'dashed',
+    borderStyle: "dashed",
     borderRadius: 12,
     backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     padding: 12,
   },
   uploadPlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   uploadText: {
-    fontSize: 16,
+    fontSize: 13.8,
     fontFamily: fonts.semiBold,
     color: colors.text,
+    textAlign: "center",
     marginTop: 16,
     marginBottom: 8,
   },
@@ -297,24 +309,24 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   videoPreview: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
     borderRadius: 12,
-    overflow: 'hidden',
-    position: 'relative',
+    overflow: "hidden",
+    position: "relative",
   },
   videoThumbnail: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   videoOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   removeVideoButton: {
-    position: 'absolute',
+    position: "absolute",
     top: 8,
     right: 8,
     backgroundColor: colors.background,
@@ -325,13 +337,14 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 16,
   },
   selectVideoButtonText: {
-    fontSize: 14,
+    fontSize: 11,
     fontFamily: fonts.semiBold,
     color: colors.textLight,
+    textAlign: "center",
   },
   inputSection: {
     marginBottom: 24,
@@ -340,14 +353,20 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   categoryLabel: {
-    fontSize: 16,
-    fontFamily: fonts.semiBold,
+    fontSize: 14,
+    fontFamily: fonts.medium,
     color: colors.text,
     marginBottom: 12,
   },
+  fieldLabel: {
+    fontSize: 14,
+    fontFamily: fonts.medium,
+    color: colors.text,
+    marginBottom: 8,
+  },
   categoryContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
   },
   categoryButton: {
     paddingVertical: 8,
@@ -392,4 +411,3 @@ const styles = StyleSheet.create({
 });
 
 export default ChallengeScreen;
-

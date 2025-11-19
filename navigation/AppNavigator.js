@@ -1,10 +1,19 @@
 import React from 'react';
-import { Image } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import colors from '../config/colors';
 import fonts from '../config/fonts';
+import HomeIcon from '../assets/navbar/home.svg';
+import HomeIconActive from '../assets/navbar/home-colored.svg';
+import DiscoverIcon from '../assets/navbar/discover.svg';
+import DiscoverIconActive from '../assets/navbar/discover-colored.svg';
+import BattlesIcon from '../assets/navbar/battles.svg';
+import BattlesIconActive from '../assets/navbar/battles-colored.svg';
+import ProfileIcon from '../assets/navbar/profile.svg';
+import ProfileIconActive from '../assets/navbar/profile-colored.svg';
+import UploadIcon from '../assets/navbar/upload.svg';
+import UploadIconActive from '../assets/navbar/upload-colored.svg';
 
 // Auth Screens
 import SplashScreen from '../screens/auth/SplashScreen';
@@ -50,13 +59,9 @@ const MainTabs = () => {
         tabBarInactiveTintColor: colors.textSecondary,
         tabBarStyle: {
           backgroundColor: colors.background,
-          borderTopColor: colors.border,
-          borderTopWidth: 1,
+          borderTopWidth: 0,
           height: 80,
-          // alignItems: 'center',
-          // justifyContent: 'center',
           paddingVertical: 8,
-          // paddingTop: 8,
         },
         tabBarLabelStyle: {
           fontSize: 12,
@@ -71,15 +76,11 @@ const MainTabs = () => {
         options={{
           tabBarLabel: "Home",
           tabBarIcon: ({ focused }) => (
-            <Image
-              source={
-                focused
-                  ? require("../assets/navbar/1 (1).png")
-                  : require("../assets/navbar/1 (2).png")
-              }
-              style={{ width: 24, height: 24, marginTop: 15 }}
-              resizeMode="contain"
-            />
+            focused ? (
+              <HomeIconActive width={24} height={24} style={{ marginTop: 15 }} />
+            ) : (
+              <HomeIcon width={24} height={24} style={{ marginTop: 15 }} />
+            )
           ),
         }}
       />
@@ -89,15 +90,11 @@ const MainTabs = () => {
         options={{
           tabBarLabel: "Discover",
           tabBarIcon: ({ focused }) => (
-            <Image
-              source={
-                focused
-                  ? require("../assets/navbar/2 (2).png")
-                  : require("../assets/navbar/2 (1).png")
-              }
-              style={{ width: 24, height: 24, marginTop: 15 }}
-              resizeMode="contain"
-            />
+            focused ? (
+              <DiscoverIconActive width={24} height={24} style={{ marginTop: 15 }} />
+            ) : (
+              <DiscoverIcon width={24} height={24} style={{ marginTop: 15 }} />
+            )
           ),
         }}
       />
@@ -107,16 +104,11 @@ const MainTabs = () => {
         options={{
           tabBarLabel: "",
           tabBarIcon: ({ focused }) => (
-            <Image
-              source={require("../assets/navbar/3.png")}
-              style={{
-                width: 60,
-                height: 60,
-                marginTop: 20,
-                // marginBottom: 10,
-              }}
-              resizeMode="contain"
-            />
+            focused ? (
+              <UploadIconActive width={60} height={60} style={{ marginTop: 22.5 }} />
+            ) : (
+              <UploadIcon width={60} height={60} style={{ marginTop: 22.5 }} />
+            )
           ),
         }}
       />
@@ -126,15 +118,11 @@ const MainTabs = () => {
         options={{
           tabBarLabel: "Battles",
           tabBarIcon: ({ focused }) => (
-            <Image
-              source={
-                focused
-                  ? require("../assets/navbar/4 (2).png")
-                  : require("../assets/navbar/4 (1).png")
-              }
-              style={{ width: 24, height: 24, marginTop: 15 }}
-              resizeMode="contain"
-            />
+            focused ? (
+              <BattlesIconActive width={24} height={24} style={{ marginTop: 15 }} />
+            ) : (
+              <BattlesIcon width={24} height={24} style={{ marginTop: 15 }} />
+            )
           ),
         }}
       />
@@ -144,15 +132,11 @@ const MainTabs = () => {
         options={{
           tabBarLabel: "Profile",
           tabBarIcon: ({ focused }) => (
-            <Image
-              source={
-                focused
-                  ? require("../assets/navbar/5 (2).png")
-                  : require("../assets/navbar/5 (1).png")
-              }
-              style={{ width: 24, height: 24, marginTop: 15 }}
-              resizeMode="contain"
-            />
+            focused ? (
+              <ProfileIconActive width={24} height={24} style={{ marginTop: 15 }} />
+            ) : (
+              <ProfileIcon width={24} height={24} style={{ marginTop: 15 }} />
+            )
           ),
         }}
       />

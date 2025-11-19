@@ -96,7 +96,7 @@ const BattleUploadScreen = ({ navigation }) => {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <CustomHeader title="Battle Upload" navigation={navigation} />
 
@@ -119,7 +119,11 @@ const BattleUploadScreen = ({ navigation }) => {
                 resizeMode="cover"
               />
               <View style={styles.videoOverlay}>
-                <Ionicons name="play-circle" size={48} color={colors.textLight} />
+                <Ionicons
+                  name="play-circle"
+                  size={48}
+                  color={colors.textLight}
+                />
               </View>
               <TouchableOpacity
                 style={styles.removeVideoButton}
@@ -136,19 +140,15 @@ const BattleUploadScreen = ({ navigation }) => {
               <UploadSvg width={64} height={64} />
               <Text style={styles.uploadText}>Upload Your Video</Text>
               <Text style={styles.uploadFormats}>MP4, MOV, AVI</Text>
+              <TouchableOpacity
+                style={styles.selectVideoButton}
+                onPress={pickVideo}
+              >
+                <Text style={styles.selectVideoButtonText}>Select Video</Text>
+              </TouchableOpacity>
             </View>
           )}
         </TouchableOpacity>
-
-        {!selectedVideo && (
-          <TouchableOpacity
-            style={styles.selectVideoButton}
-            onPress={pickVideo}
-          >
-            <Text style={styles.selectVideoButtonText}>Select Video</Text>
-          </TouchableOpacity>
-        )}
-
 
         {/* Input Fields */}
         <View style={styles.inputSection}>
@@ -157,6 +157,7 @@ const BattleUploadScreen = ({ navigation }) => {
             placeholder="Enter Title"
             value={title}
             onChangeText={setTitle}
+            labelStyle={styles.fieldLabel}
           />
 
           <CustomTextInput
@@ -167,6 +168,7 @@ const BattleUploadScreen = ({ navigation }) => {
             multiline
             numberOfLines={4}
             textAlignVertical="top"
+            labelStyle={styles.fieldLabel}
           />
         </View>
 
@@ -280,10 +282,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     borderRadius: 8,
     alignItems: 'center',
-    marginBottom: 24,
+    margin: 12,
   },
   selectVideoButtonText: {
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: fonts.semiBold,
     color: colors.textLight,
   },
@@ -294,10 +296,16 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   categoryLabel: {
-    fontSize: 16,
-    fontFamily: fonts.semiBold,
+    fontSize: 14,
+    fontFamily: fonts.medium,
     color: colors.text,
     marginBottom: 12,
+  },
+  fieldLabel: {
+    fontSize: 14,
+    fontFamily: fonts.medium,
+    color: colors.text,
+    marginBottom: 8,
   },
   categoryContainer: {
     flexDirection: 'row',

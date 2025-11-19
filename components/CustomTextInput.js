@@ -2,12 +2,22 @@ import React from 'react';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
 import colors from '../config/colors';
 
-const CustomTextInput = ({ label, placeholder, value, onChangeText, style, keyboardType, ...props }) => {
+const CustomTextInput = ({
+  label,
+  placeholder,
+  value,
+  onChangeText,
+  style,
+  keyboardType,
+  labelStyle,
+  inputStyle,
+  ...props
+}) => {
   return (
     <View style={[styles.container, style]}>
-      <Text style={styles.label}>{label}</Text>
+      {!!label && <Text style={[styles.label, labelStyle]}>{label}</Text>}
       <TextInput
-        style={styles.input}
+        style={[styles.input, inputStyle]}
         placeholder={placeholder}
         placeholderTextColor={colors.placeholder}
         value={value}
