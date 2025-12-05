@@ -32,6 +32,16 @@ yarn-error.*
 
 # local env files
 .env*.local
+.env
+
+# Firebase and Cloudinary config (contains sensitive data)
+config/firebase.js
+config/cloudinary.js
+
+# Firebase native config files
+# Note: google-services.json and GoogleService-Info.plist are safe to commit
+# Security is handled by Firebase Security Rules, not by hiding config files
+# GoogleService-Info.plist
 
 # typescript
 *.tsbuildinfo

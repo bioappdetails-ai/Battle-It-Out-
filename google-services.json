@@ -9,10 +9,18 @@
       "client_info": {
         "mobilesdk_app_id": "1:907613423588:android:bd78001d1b4f2007d129f1",
         "android_client_info": {
-          "package_name": "com.BattleItOut.app"
+          "package_name": "com.battleitout.app"
         }
       },
       "oauth_client": [
+        {
+          "client_id": "907613423588-sfughul7cvjf97t21hmpfd73rr39rnh6.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.battleitout.app",
+            "certificate_hash": "7e376c50f14a2da0b003a1ec7410eb5b6777235b"
+          }
+        },
         {
           "client_id": "907613423588-hpi2gjdqkoq8ldr4lv9q8v4ilsi43rkp.apps.googleusercontent.com",
           "client_type": 3
@@ -29,6 +37,13 @@
             {
               "client_id": "907613423588-hpi2gjdqkoq8ldr4lv9q8v4ilsi43rkp.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "907613423588-e9ev9rrm5qaqn7ohco38ki23uq920f6f.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.battleitout.app"
+              }
             }
           ]
         }

@@ -1,37 +1,465 @@
-import React, { useState } from 'react';
-import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, FlatList } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, FlatList, ActivityIndicator, RefreshControl, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../../config/colors';
 import fonts from '../../config/fonts';
+import VideoModal from '../../components/VideoModal';
+import LoadingModal from '../../components/LoadingModal';
+import { getCurrentUser } from '../../services/authService';
+import { getDocument, getDocuments, COLLECTIONS } from '../../services/firestoreService';
+import {
+  getCachedUserProfile,
+  setCachedUserProfile,
+  getCachedUserVideos,
+  setCachedUserVideos,
+  getCachedUserBattles,
+  setCachedUserBattles,
+  getCachedUserSaved,
+  setCachedUserSaved,
+} from '../../services/storageService';
 
 const ProfileScreen = ({ navigation }) => {
-  const [activeTab, setActiveTab] = useState('Battles');
+  const [activeTab, setActiveTab] = useState('Videos');
+  const [userData, setUserData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [userVideos, setUserVideos] = useState([]);
+  const [battlesVideos, setBattlesVideos] = useState([]);
+  const [savedVideos, setSavedVideos] = useState([]);
+  const [videosLoading, setVideosLoading] = useState(false);
+  const [battlesLoading, setBattlesLoading] = useState(false);
+  const [savedLoading, setSavedLoading] = useState(false);
+  const [selectedVideo, setSelectedVideo] = useState(null);
+  const [isVideoModalVisible, setIsVideoModalVisible] = useState(false);
 
-  // Sample video data with online thumbnails
-  const videos = [
-    { id: '1', thumbnail: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg' },
-    { id: '2', thumbnail: 'https://i.ytimg.com/vi/jNQXAC9IVRw/maxresdefault.jpg' },
-    { id: '3', thumbnail: 'https://i.ytimg.com/vi/9bZkp7q19f0/maxresdefault.jpg' },
-    { id: '4', thumbnail: 'https://i.ytimg.com/vi/kJQP7kiw5Fk/maxresdefault.jpg' },
-    { id: '5', thumbnail: 'https://i.ytimg.com/vi/fJ9rUzIMcZQ/maxresdefault.jpg' },
-    { id: '6', thumbnail: 'https://i.ytimg.com/vi/OPf0YbXqDm0/maxresdefault.jpg' },
-    { id: '7', thumbnail: 'https://i.ytimg.com/vi/M7FIvfx5J10/maxresdefault.jpg' },
-    { id: '8', thumbnail: 'https://i.ytimg.com/vi/L_jWHffIx5E/maxresdefault.jpg' },
-    { id: '9', thumbnail: 'https://i.ytimg.com/vi/9xwazD5SyVg/maxresdefault.jpg' },
-  ];
+  // Fetch user videos from Firestore with cache
+  const fetchUserVideos = async (forceRefresh = false) => {
+    try {
+      const currentUser = getCurrentUser();
+      if (!currentUser) {
+        setUserVideos([]);
+        return;
+      }
 
-  const renderVideo = ({ item }) => (
-    <TouchableOpacity style={styles.videoItem}>
-      <Image 
-        source={{ uri: item.thumbnail }} 
-        style={styles.videoThumbnail}
-        resizeMode="cover"
-      />
-      <View style={styles.playOverlay}>
-        <Ionicons name="play" size={20} color={colors.textLight} />
+      // Check cache first unless forcing refresh
+      if (!forceRefresh) {
+        const cachedVideos = await getCachedUserVideos(currentUser.uid);
+        if (cachedVideos) {
+          console.log('✅ Using cached user videos:', cachedVideos.length);
+          setUserVideos(cachedVideos);
+          setVideosLoading(false);
+          // Still fetch in background to update cache
+          fetchUserVideos(true).catch(() => {});
+          return;
+        }
+      }
+
+      setVideosLoading(true);
+      const videos = await getDocuments(
+        COLLECTIONS.VIDEOS,
+        [
+          { field: 'userId', operator: '==', value: currentUser.uid },
+          { field: 'status', operator: '==', value: 'active' },
+        ],
+        'createdAt',
+        'desc'
+      );
+
+      console.log('✅ Fetched user videos from Firestore:', videos.length);
+      setUserVideos(videos || []);
+      // Cache the videos
+      await setCachedUserVideos(currentUser.uid, videos || []);
+    } catch (error) {
+      console.error('❌ Error fetching user videos:', error);
+      setUserVideos([]);
+    } finally {
+      setVideosLoading(false);
+    }
+  };
+
+  // Fetch user battles from Firestore with cache
+  const fetchUserBattles = async (forceRefresh = false) => {
+    try {
+      const currentUser = getCurrentUser();
+      if (!currentUser) {
+        setBattlesVideos([]);
+        return;
+      }
+
+      // Check cache first unless forcing refresh
+      if (!forceRefresh) {
+        const cachedBattles = await getCachedUserBattles(currentUser.uid);
+        if (cachedBattles) {
+          console.log('✅ Using cached battles:', cachedBattles.length);
+          setBattlesVideos(cachedBattles);
+          setBattlesLoading(false);
+          // Still fetch in background to update cache
+          fetchUserBattles(true).catch(() => {});
+          return;
+        }
+      }
+
+      setBattlesLoading(true);
+
+      // Fetch battles where current user is player1 or player2
+      const player1Battles = await getDocuments(
+        COLLECTIONS.BATTLES,
+        [{ field: 'player1UserId', operator: '==', value: currentUser.uid }],
+        'createdAt',
+        'desc'
+      );
+
+      const player2Battles = await getDocuments(
+        COLLECTIONS.BATTLES,
+        [{ field: 'player2UserId', operator: '==', value: currentUser.uid }],
+        'createdAt',
+        'desc'
+      );
+
+      // Combine and deduplicate
+      const allBattles = [...player1Battles, ...player2Battles];
+      const uniqueBattles = allBattles.filter(
+        (battle, index, self) => index === self.findIndex((b) => b.id === battle.id)
+      );
+
+      // Filter out pending battles - only show active, completed, or expired battles
+      const activeBattles = uniqueBattles.filter(
+        (battle) => battle.status !== 'pending'
+      );
+
+      // Transform battles to match video grid format
+      const transformedBattles = await Promise.all(
+        activeBattles.map(async (battle) => {
+          const isPlayer1 = battle.player1UserId === currentUser.uid;
+          
+          // Get thumbnail from video
+          let thumbnail = null;
+          try {
+            const videoId = isPlayer1 ? battle.player1VideoId : battle.player2VideoId;
+            if (videoId) {
+              const video = await getDocument(COLLECTIONS.VIDEOS, videoId);
+              thumbnail = video?.thumbnailUrl;
+            }
+          } catch (error) {
+            console.error('Error fetching video thumbnail:', error);
+          }
+
+          // Get opponent info for navigation
+          const opponentUserId = isPlayer1 ? battle.player2UserId : battle.player1UserId;
+          let opponentUser = null;
+          try {
+            if (opponentUserId) {
+              opponentUser = await getDocument(COLLECTIONS.USERS, opponentUserId);
+            }
+          } catch (error) {
+            console.error('Error fetching opponent user:', error);
+          }
+
+          return {
+            id: battle.id,
+            thumbnail: thumbnail || (isPlayer1 ? battle.player1Thumbnail : battle.player2Thumbnail) || null,
+            thumbnailUrl: thumbnail || (isPlayer1 ? battle.player1Thumbnail : battle.player2Thumbnail) || null,
+            videoUrl: isPlayer1 ? battle.player1VideoUrl : battle.player2VideoUrl,
+            type: 'battle',
+            battle: battle, // Store full battle object for navigation
+            title: battle.title || battle.category || 'Battle',
+            opponentName: opponentUser?.displayName || opponentUser?.userName || 'Opponent',
+          };
+        })
+      );
+      
+      console.log('✅ Loaded battles:', transformedBattles.length);
+      setBattlesVideos(transformedBattles);
+      // Cache the battles
+      await setCachedUserBattles(currentUser.uid, transformedBattles);
+    } catch (error) {
+      console.error('❌ Error fetching battles:', error);
+      setBattlesVideos([]);
+    } finally {
+      setBattlesLoading(false);
+    }
+  };
+
+  // Fetch user saved videos from Firestore with cache
+  const fetchUserSaved = async (forceRefresh = false) => {
+    try {
+      const currentUser = getCurrentUser();
+      if (!currentUser) {
+        setSavedVideos([]);
+        return;
+      }
+
+      // Check cache first unless forcing refresh
+      if (!forceRefresh) {
+        const cachedSaved = await getCachedUserSaved(currentUser.uid);
+        if (cachedSaved) {
+          console.log('✅ Using cached saved videos:', cachedSaved.length);
+          setSavedVideos(cachedSaved);
+          setSavedLoading(false);
+          // Still fetch in background to update cache
+          fetchUserSaved(true).catch(() => {});
+          return;
+        }
+      }
+
+      setSavedLoading(true);
+      
+      // Fetch saved videos from Firestore
+      const savedItems = await getDocuments(
+        COLLECTIONS.SAVED_VIDEOS,
+        [{ field: 'userId', operator: '==', value: currentUser.uid }],
+        'createdAt',
+        'desc'
+      );
+
+      // Transform saved videos to match video grid format
+      const transformedSaved = savedItems.map((item) => ({
+        id: item.id,
+        thumbnail: item.thumbnailUrl || null,
+        thumbnailUrl: item.thumbnailUrl || null,
+        videoUrl: item.videoUrl || null,
+        type: 'saved',
+        title: item.title || 'Saved Video',
+        category: item.category || 'General',
+        playerName: item.playerName || 'Unknown',
+        battleId: item.battleId,
+        videoId: item.videoId,
+        playerNumber: item.playerNumber,
+      }));
+      
+      console.log('✅ Loaded saved videos:', transformedSaved.length);
+      setSavedVideos(transformedSaved);
+      // Cache the saved videos
+      await setCachedUserSaved(currentUser.uid, transformedSaved);
+    } catch (error) {
+      console.error('❌ Error fetching saved videos:', error);
+      setSavedVideos([]);
+    } finally {
+      setSavedLoading(false);
+    }
+  };
+
+  // Get videos based on active tab
+  const getVideosForTab = () => {
+    switch (activeTab) {
+      case 'Videos':
+        return userVideos;
+      case 'Battles':
+        return battlesVideos;
+      case 'Saved':
+        return savedVideos;
+      default:
+        return userVideos;
+    }
+  };
+
+  // Get empty state message based on active tab
+  const getEmptyMessage = () => {
+    switch (activeTab) {
+      case 'Videos':
+        return "You don't have any videos";
+      case 'Battles':
+        return "You don't have any battles";
+      case 'Saved':
+        return "You don't have any videos saved";
+      default:
+        return "You don't have any videos";
+    }
+  };
+
+  const videos = getVideosForTab();
+
+  const fetchUserData = async (forceRefresh = false) => {
+    try {
+      const currentUser = getCurrentUser();
+      if (!currentUser) {
+        console.error('No current user found');
+        setLoading(false);
+        return;
+      }
+
+      // Check cache first unless forcing refresh
+      if (!forceRefresh) {
+        const cachedProfile = await getCachedUserProfile(currentUser.uid);
+        if (cachedProfile) {
+          console.log('✅ Using cached user profile');
+          setUserData(cachedProfile);
+          setLoading(false);
+          // Still fetch in background to update cache
+          fetchUserData(true).catch(() => {});
+          return;
+        }
+      }
+
+      console.log('📝 Fetching user data from Firestore for:', currentUser.uid);
+      const profile = await getDocument(COLLECTIONS.USERS, currentUser.uid);
+      
+      if (profile) {
+        console.log('✅ User profile loaded from Firestore:', profile);
+        setUserData(profile);
+        // Cache the profile
+        await setCachedUserProfile(currentUser.uid, profile);
+      } else {
+        console.warn('⚠️ No profile found for user');
+        // If no profile, redirect to profile creation
+        navigation.replace('ProfileCreation', {
+          userId: currentUser.uid,
+          email: currentUser.email,
+        });
+      }
+    } catch (error) {
+      console.error('❌ Error fetching user data:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    // Focus listener to refresh data when screen is focused
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchUserData();
+      // Load data for current tab
+      if (activeTab === 'Videos') {
+        fetchUserVideos();
+      } else if (activeTab === 'Battles') {
+        fetchUserBattles();
+      } else if (activeTab === 'Saved') {
+        fetchUserSaved();
+      }
+    });
+
+    // Initial load
+    fetchUserData();
+    if (activeTab === 'Videos') {
+      fetchUserVideos();
+    } else if (activeTab === 'Battles') {
+      fetchUserBattles();
+    } else if (activeTab === 'Saved') {
+      fetchUserSaved();
+    }
+
+    return unsubscribe;
+  }, [navigation]);
+
+  // Fetch data when tab changes
+  useEffect(() => {
+    if (activeTab === 'Videos') {
+      fetchUserVideos();
+    } else if (activeTab === 'Battles') {
+      fetchUserBattles();
+    } else if (activeTab === 'Saved') {
+      fetchUserSaved();
+    }
+  }, [activeTab]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    // Force refresh all data
+    await fetchUserData(true);
+    if (activeTab === 'Videos') {
+      await fetchUserVideos(true);
+    } else if (activeTab === 'Battles') {
+      await fetchUserBattles(true);
+    } else if (activeTab === 'Saved') {
+      await fetchUserSaved(true);
+    }
+    setRefreshing(false);
+  };
+
+  // Calculate win rate
+  const getWinRate = () => {
+    if (!userData) return '0/0';
+    const total = userData?.totalBattles || 0;
+    const won = userData?.battlesWon || 0;
+    return `${won}/${total}`;
+  };
+
+  // Get profile image source
+  const getProfileImageSource = () => {
+    if (userData?.profileImage) {
+      return { uri: userData.profileImage };
+    }
+    return require('../../assets/profile.jpg');
+  };
+
+  const handleVideoPress = (item) => {
+    // Get video URL based on item type
+    let videoUrl = null;
+    
+    if (item.videoUrl) {
+      videoUrl = item.videoUrl;
+    } else if (item.type === 'battle' && item.battle) {
+      // For battles, determine which player's video to show
+      const currentUser = getCurrentUser();
+      if (currentUser) {
+        const isPlayer1 = item.battle.player1UserId === currentUser.uid;
+        videoUrl = isPlayer1 ? item.battle.player1VideoUrl : item.battle.player2VideoUrl;
+      }
+    } else if (item.type === 'saved' && item.videoId) {
+      // For saved videos, we might need to fetch the video document
+      // But for now, use videoUrl if available
+      videoUrl = item.videoUrl;
+    } else if (activeTab === 'Videos') {
+      // For regular videos, use videoUrl field
+      videoUrl = item.videoUrl;
+    }
+
+    if (videoUrl) {
+      setSelectedVideo(videoUrl);
+      setIsVideoModalVisible(true);
+    } else {
+      Alert.alert('Error', 'Video URL not available');
+    }
+  };
+
+  const handleCloseVideoModal = () => {
+    setIsVideoModalVisible(false);
+    setSelectedVideo(null);
+  };
+
+  const renderVideo = ({ item }) => {
+    // Use thumbnailUrl from Firestore for Videos tab, or thumbnail for other tabs
+    const thumbnailUri = item.thumbnailUrl || item.thumbnail;
+    
+    return (
+      <TouchableOpacity
+        style={styles.videoItem}
+        onPress={() => handleVideoPress(item)}
+        activeOpacity={0.8}
+      >
+        <Image 
+          source={
+            thumbnailUri 
+              ? { uri: thumbnailUri }
+              : require('../../assets/profile.jpg')
+          } 
+          style={styles.videoThumbnail}
+          resizeMode="cover"
+        />
+        <View style={styles.playOverlay}>
+          <Ionicons name="play" size={20} color={colors.textLight} />
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  if (!userData && !loading) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <Text style={styles.errorText}>No profile data found</Text>
       </View>
-    </TouchableOpacity>
-  );
+    );
+  }
+
+  // Don't render if userData is null - show loading modal instead
+  if (!userData) {
+    return (
+      <View style={styles.container}>
+        <LoadingModal visible={true} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -43,36 +471,17 @@ const ProfileScreen = ({ navigation }) => {
         >
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>jane01-a</Text>
+        <Text style={styles.headerTitle}>{userData?.userName || userData?.displayName || 'Profile'}</Text>
         <TouchableOpacity 
           style={styles.settingsButton}
           onPress={() => {
-            // Debug: Check if navigation object exists
-            console.log('Settings button pressed');
-            console.log('Navigation object:', navigation);
-            console.log('Navigation state:', navigation.getState());
-            
-            // Debug: Try different navigation methods
             try {
-              console.log('Attempting navigation.navigate("Settings")');
               navigation.navigate('Settings');
-              console.log('Navigation.navigate() called successfully');
             } catch (error) {
-              console.error('Error with navigation.navigate():', error);
-              
-              // Fallback: Try parent navigator
-              try {
-                console.log('Trying parent navigator...');
-                const parent = navigation.getParent();
-                console.log('Parent navigator:', parent);
-                if (parent) {
-                  parent.navigate('Settings');
-                  console.log('Parent.navigate() called successfully');
-                } else {
-                  console.error('No parent navigator found');
-                }
-              } catch (parentError) {
-                console.error('Error with parent navigator:', parentError);
+              console.error('Navigation error:', error);
+              const parent = navigation.getParent();
+              if (parent) {
+                parent.navigate('Settings');
               }
             }
           }}
@@ -84,12 +493,19 @@ const ProfileScreen = ({ navigation }) => {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[colors.primary]}
+          />
+        }
       >
         {/* Profile Card */}
         <View style={styles.profileImageContainerBg}>
           <View style={styles.profileImageContainer}>
             <Image
-              source={require("../../assets/profile.jpg")}
+              source={getProfileImageSource()}
               style={styles.profileImage}
             />
           </View>
@@ -97,7 +513,7 @@ const ProfileScreen = ({ navigation }) => {
         <View style={styles.profileCard}>
           <View style={styles.nameContainer}>
             <View style={styles.nameRow}>
-              <Text style={styles.name}>Jane Cooper</Text>
+              <Text style={styles.name}>{userData?.displayName || 'User'}</Text>
               <TouchableOpacity 
                 style={styles.editButton}
                 onPress={() => navigation.navigate('UpdateProfile')}
@@ -109,21 +525,21 @@ const ProfileScreen = ({ navigation }) => {
                 />
               </TouchableOpacity>
             </View>
-            <Text style={styles.profession}>UI/UX Designer</Text>
+            <Text style={styles.profession}>{userData?.profession || 'No profession'}</Text>
           </View>
 
           {/* Stats */}
           <View style={styles.statsContainer}>
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>512</Text>
+              <Text style={styles.statNumber}>{userData?.followers || 0}</Text>
               <Text style={styles.statLabel}>Followers</Text>
             </View>
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>500</Text>
+              <Text style={styles.statNumber}>{userData?.following || 0}</Text>
               <Text style={styles.statLabel}>Following</Text>
             </View>
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>49/50</Text>
+              <Text style={styles.statNumber}>{getWinRate()}</Text>
               <Text style={styles.statLabel}>Win Battle</Text>
             </View>
           </View>
@@ -131,6 +547,34 @@ const ProfileScreen = ({ navigation }) => {
 
         {/* Action Buttons */}
         <View style={styles.actionButtons}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => setActiveTab("Videos")}
+          >
+            <View
+              style={[
+                styles.actionIconContainer,
+                activeTab === "Videos"
+                  ? styles.actionIconContainerActive
+                  : styles.actionIconContainerInactive,
+              ]}
+            >
+              <Ionicons
+                name="videocam-outline"
+                size={20}
+                color={colors.textLight}
+              />
+            </View>
+            <Text
+              style={[
+                styles.actionButtonText,
+                activeTab === "Videos" && styles.actionButtonTextActive,
+              ]}
+            >
+              Videos
+            </Text>
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={styles.actionButton}
             onPress={() => setActiveTab("Battles")}
@@ -156,34 +600,6 @@ const ProfileScreen = ({ navigation }) => {
               ]}
             >
               Battles
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => setActiveTab("Archive")}
-          >
-            <View
-              style={[
-                styles.actionIconContainer,
-                activeTab === "Archive"
-                  ? styles.actionIconContainerActive
-                  : styles.actionIconContainerInactive,
-              ]}
-            >
-              <Ionicons
-                name="archive-outline"
-                size={20}
-                color={colors.textLight}
-              />
-            </View>
-            <Text
-              style={[
-                styles.actionButtonText,
-                activeTab === "Archive" && styles.actionButtonTextActive,
-              ]}
-            >
-              Archive
             </Text>
           </TouchableOpacity>
 
@@ -216,16 +632,38 @@ const ProfileScreen = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
-        {/* Video Grid */}
-        <FlatList
-          data={videos}
-          renderItem={renderVideo}
-          keyExtractor={(item) => item.id}
-          numColumns={3}
-          scrollEnabled={false}
-          contentContainerStyle={styles.videoGrid}
-        />
+        {/* Video Grid or Empty State */}
+        {videos.length > 0 ? (
+          <FlatList
+            key={activeTab} // Force re-render when tab changes
+            data={videos}
+            renderItem={renderVideo}
+            keyExtractor={(item) => item.id}
+            numColumns={3}
+            scrollEnabled={false}
+            contentContainerStyle={styles.videoGrid}
+          />
+        ) : (
+          <View style={styles.emptyStateContainer}>
+            <Ionicons 
+              name="videocam-outline" 
+              size={64} 
+              color={colors.textSecondary} 
+            />
+            <Text style={styles.emptyStateText}>{getEmptyMessage()}</Text>
+          </View>
+        )}
       </ScrollView>
+
+      {/* Video Modal */}
+      <VideoModal
+        visible={isVideoModalVisible}
+        videoUri={selectedVideo}
+        onClose={handleCloseVideoModal}
+      />
+
+      {/* Loading Modal */}
+      <LoadingModal visible={loading || (videosLoading && activeTab === 'Videos') || (battlesLoading && activeTab === 'Battles') || (savedLoading && activeTab === 'Saved')} />
     </View>
   );
 };
@@ -411,6 +849,28 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.3)",
     alignItems: "center",
     justifyContent: "center",
+  },
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    fontFamily: fonts.regular,
+  },
+  emptyStateContainer: {
+    paddingVertical: 60,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    fontFamily: fonts.regular,
+    marginTop: 16,
+    textAlign: 'center',
   },
 });
 

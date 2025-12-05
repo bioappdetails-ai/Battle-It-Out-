@@ -1,22 +1,56 @@
 import React, { useState } from 'react';
-import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../../config/colors';
 import fonts from '../../config/fonts';
 import CodeInput from '../../components/CodeInput';
 import CustomButton from '../../components/CustomButton';
 import CustomHeader from '../../components/CustomHeader';
+import { getCurrentUser } from '../../services/authService';
+import { updatePassword, reload } from 'firebase/auth';
 
-const UpdatePasswordVerificationScreen = ({ navigation }) => {
+const UpdatePasswordVerificationScreen = ({ navigation, route }) => {
+  const { currentPassword, newPassword } = route.params || {};
   const [code, setCode] = useState('');
+  const [verifying, setVerifying] = useState(false);
 
-  const handleNext = () => {
-    if (code === '0000') {
-      Alert.alert('Success', 'Your password has been updated successfully!', [
-        { text: 'OK', onPress: () => navigation.navigate('Security') }
-      ]);
-    } else {
-      Alert.alert('Error', 'Please enter the correct verification code: 0000');
+  const handleNext = async () => {
+    try {
+      setVerifying(true);
+      const currentUser = getCurrentUser();
+      if (!currentUser || !currentUser.email) {
+        Alert.alert('Error', 'User not found');
+        return;
+      }
+
+      // Reload user to check if email is verified
+      await reload(currentUser);
+      const updatedUser = getCurrentUser();
+      
+      if (updatedUser && updatedUser.emailVerified) {
+        // Email verified, update password
+        try {
+          await updatePassword(updatedUser, newPassword);
+          Alert.alert('Success', 'Your password has been updated successfully!', [
+            { text: 'OK', onPress: () => navigation.navigate('Security') }
+          ]);
+        } catch (error) {
+          console.error('Error updating password:', error);
+          if (error.code === 'auth/requires-recent-login') {
+            Alert.alert('Error', 'Please log out and log back in before changing your password.');
+          } else {
+            Alert.alert('Error', 'Failed to update password. Please try again.');
+          }
+        }
+      } else {
+        Alert.alert('Error', 'Please verify your email by clicking the link sent to your inbox, then try again.');
+        setCode('');
+      }
+    } catch (error) {
+      console.error('Error verifying OTP:', error);
+      Alert.alert('Error', 'Failed to verify code. Please try again.');
+    } finally {
+      setVerifying(false);
     }
   };
 
@@ -43,7 +77,7 @@ const UpdatePasswordVerificationScreen = ({ navigation }) => {
 
         {/* Subtitle */}
         <Text style={styles.subtitle}>
-          We have sent the verification code to your email address
+          Please verify your email by clicking the link sent to your inbox, then click Verify below.
         </Text>
 
         {/* Verification Image */}
@@ -53,20 +87,12 @@ const UpdatePasswordVerificationScreen = ({ navigation }) => {
           resizeMode="contain"
         />
 
-        {/* Code Input Fields */}
-        <View style={styles.codeContainer}>
-          <CodeInput
-            length={4}
-            value={code}
-            onCodeChange={setCode}
-          />
-        </View>
-
-        {/* Next Button */}
+        {/* Verify Button */}
         <CustomButton
-          text="Verify"
+          text={verifying ? "Verifying..." : "Verify Email & Update Password"}
           onPress={handleNext}
           style={styles.verifyButton}
+          disabled={verifying}
         />
       </ScrollView>
     </KeyboardAvoidingView>

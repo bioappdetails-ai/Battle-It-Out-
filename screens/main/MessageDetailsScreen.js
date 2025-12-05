@@ -10,18 +10,45 @@ import {
   KeyboardAvoidingView,
   Platform,
   Animated,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../../config/colors';
 import fonts from '../../config/fonts';
+import LoadingModal from '../../components/LoadingModal';
+import { getCurrentUser } from '../../services/authService';
+import {
+  getDocuments,
+  getDocument,
+  createDocument,
+  updateDocument,
+  subscribeToCollection,
+  subscribeToDocument,
+  COLLECTIONS,
+  timestampToDate,
+} from '../../services/firestoreService';
+import { generateUUID } from '../../utils/uuid';
+import { serverTimestamp, increment } from 'firebase/firestore';
 
 const MessageDetailsScreen = ({ route, navigation }) => {
   const { message } = route.params || {};
   const scrollViewRef = useRef(null);
   const [inputText, setInputText] = useState('');
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+  const [otherUserTyping, setOtherUserTyping] = useState(false);
   const statusOpacity = useRef(new Animated.Value(1)).current;
+  const typingTimeoutRef = useRef(null);
+  const conversationIdRef = useRef(null);
+  const otherUserIdRef = useRef(null);
+  const typingAnimationRef = useRef(null);
+  const unsubscribeMessagesRef = useRef(null);
 
-  // Default message data
+  // Get contact data from route params
   const contactData = message || {
     id: '1',
     senderName: 'Darlene Steward',
@@ -29,53 +56,259 @@ const MessageDetailsScreen = ({ route, navigation }) => {
     isOnline: true,
   };
 
-  // Sample conversation messages
-  const conversationMessages = [
-    {
-      id: '1',
-      text: 'Hey! How are you doing?',
-      isSent: false,
-      timestamp: '10:30 AM',
-    },
-    {
-      id: '2',
-      text: 'I\'m doing great, thanks for asking! How about you?',
-      isSent: true,
-      timestamp: '10:32 AM',
-    },
-    {
-      id: '3',
-      text: 'Pls take a look at the images.',
-      isSent: false,
-      timestamp: '10:35 AM',
-    },
-    {
-      id: '4',
-      text: 'Sure, let me check them out.',
-      isSent: true,
-      timestamp: '10:36 AM',
-    },
-    {
-      id: '5',
-      text: 'What do you think?',
-      isSent: false,
-      timestamp: '10:40 AM',
-    },
-    {
-      id: '6',
-      text: 'They look amazing! Great work!',
-      isSent: true,
-      timestamp: '10:42 AM',
-    },
-  ];
+  const otherUserId = contactData.senderId || contactData.id;
+  const conversationId = contactData.conversationId;
 
+  // Debug logging
   useEffect(() => {
-    // Scroll to bottom when component mounts
-    setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: false });
-    }, 100);
+    console.log('MessageDetailsScreen - Route params:', route.params);
+    console.log('MessageDetailsScreen - Contact data:', contactData);
+    console.log('MessageDetailsScreen - ConversationId:', conversationId);
+    console.log('MessageDetailsScreen - OtherUserId:', otherUserId);
+  }, []);
 
-    // Animate status appear and disappear
+  // Format timestamp helper
+  const formatTimestamp = (timestamp) => {
+    if (!timestamp) return '';
+    
+    try {
+      const date = timestampToDate(timestamp);
+      const now = new Date();
+      const isToday = date.toDateString() === now.toDateString();
+      
+      if (isToday) {
+        return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+      }
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    } catch (error) {
+      return '';
+    }
+  };
+
+  // Fetch messages and set up real-time listener
+  useEffect(() => {
+    if (!conversationId) {
+      console.warn('No conversationId provided, cannot fetch messages');
+      setMessages([]);
+      setLoading(false);
+      return;
+    }
+
+    const fetchMessages = async () => {
+      try {
+        setLoading(true);
+        const currentUser = getCurrentUser();
+        if (!currentUser) {
+          console.warn('No current user, cannot fetch messages');
+          setMessages([]);
+          setLoading(false);
+          return;
+        }
+
+        conversationIdRef.current = conversationId;
+        otherUserIdRef.current = otherUserId;
+
+        console.log('Fetching messages for conversationId:', conversationId);
+
+        // Subscribe to real-time messages
+        const unsubscribe = subscribeToCollection(
+          COLLECTIONS.MESSAGES,
+          async (messagesData) => {
+            console.log('Received messages data:', messagesData.length, 'messages');
+            const conversationMessages = messagesData
+              .filter((msg) => msg.conversationId === conversationId)
+              .map((msg) => ({
+                id: msg.id,
+                text: msg.text,
+                senderId: msg.senderId,
+                receiverId: msg.receiverId,
+                status: msg.status || 'sent', // sent, delivered, read
+                isSent: msg.senderId === currentUser.uid,
+                timestamp: formatTimestamp(msg.createdAt),
+                createdAt: msg.createdAt,
+              }))
+              .sort((a, b) => {
+                // Sort by timestamp
+                if (!a.createdAt || !b.createdAt) return 0;
+                const aTime = a.createdAt.toMillis ? a.createdAt.toMillis() : 0;
+                const bTime = b.createdAt.toMillis ? b.createdAt.toMillis() : 0;
+                return aTime - bTime;
+              });
+
+            console.log('Filtered conversation messages:', conversationMessages.length);
+            setMessages(conversationMessages);
+            setLoading(false);
+
+            // Mark received messages as delivered/read when receiver views conversation
+            // Only mark messages where current user is the receiver and status is not already read
+            const unreadReceivedMessages = conversationMessages.filter(
+              (msg) => msg.receiverId === currentUser.uid && msg.status !== 'read'
+            );
+
+            if (unreadReceivedMessages.length > 0) {
+              // Mark all unread messages as delivered immediately
+              const updatePromises = unreadReceivedMessages.map(async (msg) => {
+                try {
+                  // Update message status to delivered if it's still 'sent'
+                  if (msg.status === 'sent') {
+                    await updateDocument(COLLECTIONS.MESSAGES, msg.id, {
+                      status: 'delivered',
+                    });
+                  }
+                  
+                  // After a short delay, mark as read (simulating user reading the message)
+                  setTimeout(async () => {
+                    try {
+                      await updateDocument(COLLECTIONS.MESSAGES, msg.id, {
+                        status: 'read',
+                      });
+                    } catch (error) {
+                      console.error('Error marking message as read:', error);
+                    }
+                  }, 1000); // 1 second delay to show delivered state
+                } catch (error) {
+                  console.error('Error updating message status to delivered:', error);
+                }
+              });
+
+              // Wait for all delivered updates to complete
+              await Promise.all(updatePromises);
+
+              // Clear unread count for current user (receiver)
+              try {
+                await updateDocument(COLLECTIONS.CONVERSATIONS, conversationId, {
+                  [`unreadCount.${currentUser.uid}`]: 0,
+                });
+              } catch (error) {
+                console.error('Error clearing unread count:', error);
+              }
+            }
+
+            // Scroll to bottom when new messages arrive
+            setTimeout(() => {
+              scrollViewRef.current?.scrollToEnd({ animated: true });
+            }, 100);
+          },
+          [
+            { field: 'conversationId', operator: '==', value: conversationId },
+          ],
+          'createdAt',
+          'asc'
+        );
+
+        return unsubscribe;
+      } catch (error) {
+        console.error('Error fetching messages:', error);
+        setMessages([]);
+        setLoading(false);
+      }
+    };
+
+    const unsubscribe = fetchMessages();
+    return () => {
+      if (unsubscribe && typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
+      unsubscribeMessagesRef.current = null;
+    };
+  }, [conversationId]);
+
+  // Handle pull-to-refresh
+  const handleRefresh = async () => {
+    if (!conversationId || refreshing) return;
+
+    try {
+      setRefreshing(true);
+      const currentUser = getCurrentUser();
+      if (!currentUser) {
+        setRefreshing(false);
+        return;
+      }
+
+      // Force refresh by re-subscribing to messages
+      // The real-time listener will automatically update the messages
+      // We just need to trigger a refresh state
+      
+      // Small delay to show refresh indicator
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // The real-time listener will handle the actual data refresh
+      setRefreshing(false);
+    } catch (error) {
+      console.error('Error refreshing messages:', error);
+      setRefreshing(false);
+    }
+  };
+
+  // Subscribe to typing status
+  useEffect(() => {
+    if (!conversationId) return;
+
+    const unsubscribe = subscribeToDocument(
+      COLLECTIONS.CONVERSATIONS,
+      conversationId,
+      (conversation) => {
+        if (conversation && conversation.typing) {
+          const currentUser = getCurrentUser();
+          if (currentUser && otherUserId) {
+            // Check if other user is typing
+            const otherUserTypingStatus = conversation.typing[otherUserId];
+            setOtherUserTyping(otherUserTypingStatus === true);
+          }
+        } else {
+          setOtherUserTyping(false);
+        }
+      }
+    );
+
+    return () => {
+      if (unsubscribe && typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
+    };
+  }, [conversationId, otherUserId]);
+
+  // Handle typing indicator
+  useEffect(() => {
+    const currentUser = getCurrentUser();
+    if (!currentUser || !conversationId) return;
+
+    // Clear existing timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    if (inputText.trim().length > 0) {
+      // Set typing status
+      setIsTyping(true);
+      updateDocument(COLLECTIONS.CONVERSATIONS, conversationId, {
+        [`typing.${currentUser.uid}`]: true,
+      });
+
+      // Clear typing status after 3 seconds of no typing
+      typingTimeoutRef.current = setTimeout(() => {
+        setIsTyping(false);
+        updateDocument(COLLECTIONS.CONVERSATIONS, conversationId, {
+          [`typing.${currentUser.uid}`]: false,
+        });
+      }, 3000);
+    } else {
+      // Clear typing status immediately if input is empty
+      setIsTyping(false);
+      updateDocument(COLLECTIONS.CONVERSATIONS, conversationId, {
+        [`typing.${currentUser.uid}`]: false,
+      });
+    }
+
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, [inputText, conversationId]);
+
+  // Animate status appear and disappear
+  useEffect(() => {
     const statusAnimation = Animated.loop(
       Animated.sequence([
         Animated.timing(statusOpacity, {
@@ -99,51 +332,193 @@ const MessageDetailsScreen = ({ route, navigation }) => {
     };
   }, [statusOpacity]);
 
-  const handleSend = () => {
-    if (inputText.trim()) {
-      // Handle send message logic here
-      console.log('Sending message:', inputText);
-      setInputText('');
+  // Cleanup typing status on unmount
+  useEffect(() => {
+    return () => {
+      const currentUser = getCurrentUser();
+      if (currentUser && conversationIdRef.current) {
+        updateDocument(COLLECTIONS.CONVERSATIONS, conversationIdRef.current, {
+          [`typing.${currentUser.uid}`]: false,
+        });
+      }
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleSend = async () => {
+    if (!inputText.trim() || sending || !conversationId) return;
+
+    const messageText = inputText.trim();
+    setInputText(''); // Clear input immediately for better UX
+
+    try {
+      setSending(true);
+      const currentUser = getCurrentUser();
+      if (!currentUser) {
+        setInputText(messageText); // Restore on error
+        return;
+      }
+
+      // Clear typing status
+      setIsTyping(false);
+      await updateDocument(COLLECTIONS.CONVERSATIONS, conversationId, {
+        [`typing.${currentUser.uid}`]: false,
+      });
+
+      // Create message document with status
+      const messageId = generateUUID();
+      await createDocument(
+        COLLECTIONS.MESSAGES,
+        {
+          conversationId: conversationId,
+          senderId: currentUser.uid,
+          receiverId: otherUserId,
+          text: messageText,
+          status: 'sent', // sent, delivered, read
+        },
+        messageId
+      );
+
+      // Update conversation with last message
+      // Only increment unreadCount for the receiver (not sender)
+      await updateDocument(COLLECTIONS.CONVERSATIONS, conversationId, {
+        lastMessage: messageText,
+        lastMessageTime: serverTimestamp(),
+        [`unreadCount.${otherUserId}`]: increment(1),
+      });
+
       // Scroll to bottom after sending
       setTimeout(() => {
         scrollViewRef.current?.scrollToEnd({ animated: true });
       }, 100);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      // Restore input text on error
+      setInputText(messageText);
+    } finally {
+      setSending(false);
     }
   };
 
-  const renderMessage = (msg) => (
-    <View
-      key={msg.id}
-      style={[
-        styles.messageContainer,
-        msg.isSent ? styles.sentMessage : styles.receivedMessage,
-      ]}
-    >
+  // Typing indicator component
+  const TypingIndicator = React.memo(() => {
+    const dot1 = useRef(new Animated.Value(0.3)).current;
+    const dot2 = useRef(new Animated.Value(0.3)).current;
+    const dot3 = useRef(new Animated.Value(0.3)).current;
+
+    useEffect(() => {
+      const animateDot = (dot, delay) => {
+        return Animated.loop(
+          Animated.sequence([
+            Animated.delay(delay),
+            Animated.timing(dot, {
+              toValue: 1,
+              duration: 400,
+              useNativeDriver: true,
+            }),
+            Animated.timing(dot, {
+              toValue: 0.3,
+              duration: 400,
+              useNativeDriver: true,
+            }),
+          ])
+        );
+      };
+
+      const anim1 = animateDot(dot1, 0);
+      const anim2 = animateDot(dot2, 200);
+      const anim3 = animateDot(dot3, 400);
+
+      anim1.start();
+      anim2.start();
+      anim3.start();
+
+      return () => {
+        anim1.stop();
+        anim2.stop();
+        anim3.stop();
+      };
+    }, []);
+
+    return (
+      <View style={styles.typingIndicatorContainer}>
+        <View style={styles.typingBubble}>
+          <Animated.View style={[styles.typingDot, { opacity: dot1 }]} />
+          <Animated.View style={[styles.typingDot, { opacity: dot2 }]} />
+          <Animated.View style={[styles.typingDot, { opacity: dot3 }]} />
+        </View>
+      </View>
+    );
+  });
+
+  const renderMessage = (msg) => {
+    // Get read receipt icon based on status (only for sent messages)
+    const getReadReceiptIcon = () => {
+      if (!msg.isSent) return null;
+      
+      if (msg.status === 'read') {
+        // Two ticks, primary color (read)
+        return (
+          <View style={styles.readReceiptContainer}>
+            <Ionicons name="checkmark-done" size={14} color={colors.primary} />
+          </View>
+        );
+      } else if (msg.status === 'delivered') {
+        // Two ticks, secondary color (delivered)
+        return (
+          <View style={styles.readReceiptContainer}>
+            <Ionicons name="checkmark-done" size={14} color={colors.secondary} />
+          </View>
+        );
+      } else {
+        // One tick, secondary color (sent)
+        return (
+          <View style={styles.readReceiptContainer}>
+            <Ionicons name="checkmark" size={14} color={colors.secondary} />
+          </View>
+        );
+      }
+    };
+
+    return (
       <View
+        key={msg.id}
         style={[
-          styles.messageBubble,
-          msg.isSent ? styles.sentBubble : styles.receivedBubble,
+          styles.messageContainer,
+          msg.isSent ? styles.sentMessage : styles.receivedMessage,
         ]}
       >
-        <Text
+        <View
           style={[
-            styles.messageText,
-            msg.isSent ? styles.sentMessageText : styles.receivedMessageText,
+            styles.messageBubble,
+            msg.isSent ? styles.sentBubble : styles.receivedBubble,
           ]}
         >
-          {msg.text}
-        </Text>
-        <Text
-          style={[
-            styles.messageTime,
-            msg.isSent ? styles.sentMessageTime : styles.receivedMessageTime,
-          ]}
-        >
-          {msg.timestamp}
-        </Text>
+          <Text
+            style={[
+              styles.messageText,
+              msg.isSent ? styles.sentMessageText : styles.receivedMessageText,
+            ]}
+          >
+            {msg.text}
+          </Text>
+          <View style={styles.messageFooter}>
+            <Text
+              style={[
+                styles.messageTime,
+                msg.isSent ? styles.sentMessageTime : styles.receivedMessageTime,
+              ]}
+            >
+              {msg.timestamp}
+            </Text>
+            {getReadReceiptIcon()}
+          </View>
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <KeyboardAvoidingView
@@ -178,7 +553,13 @@ const MessageDetailsScreen = ({ route, navigation }) => {
         >
           <View style={styles.headerAvatarContainer}>
             <Image
-              source={{ uri: contactData.avatar }}
+              source={
+                contactData.avatar
+                  ? typeof contactData.avatar === 'string'
+                    ? { uri: contactData.avatar }
+                    : contactData.avatar
+                  : require('../../assets/profile.jpg')
+              }
               style={styles.headerAvatar}
             />
             {contactData.isOnline && (
@@ -209,8 +590,26 @@ const MessageDetailsScreen = ({ route, navigation }) => {
         style={styles.messagesList}
         contentContainerStyle={styles.messagesContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
+          />
+        }
       >
-        {conversationMessages.map(renderMessage)}
+        {messages.length === 0 && !loading ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No messages yet</Text>
+            <Text style={styles.emptySubtext}>Start the conversation by sending a message</Text>
+          </View>
+        ) : (
+          <>
+            {messages.map(renderMessage)}
+            {otherUserTyping && <TypingIndicator />}
+          </>
+        )}
       </ScrollView>
 
       {/* Input Area */}
@@ -228,19 +627,26 @@ const MessageDetailsScreen = ({ route, navigation }) => {
           <TouchableOpacity
             style={[
               styles.sendButton,
-              !inputText.trim() && styles.sendButtonDisabled,
+              (!inputText.trim() || sending) && styles.sendButtonDisabled,
             ]}
             onPress={handleSend}
-            disabled={!inputText.trim()}
+            disabled={!inputText.trim() || sending}
           >
-            <Ionicons
-              name="send"
-              size={20}
-              color={inputText.trim() ? colors.textLight : colors.textSecondary}
-            />
+            {sending ? (
+              <ActivityIndicator size="small" color={colors.textLight} />
+            ) : (
+              <Ionicons
+                name="send"
+                size={20}
+                color={inputText.trim() ? colors.textLight : colors.textSecondary}
+              />
+            )}
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Loading Modal */}
+      <LoadingModal visible={loading} />
     </KeyboardAvoidingView>
   );
 };
@@ -249,6 +655,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+    paddingBottom: 20,
   },
   header: {
     flexDirection: 'row',
@@ -350,16 +757,25 @@ const styles = StyleSheet.create({
   receivedMessageText: {
     color: colors.text,
   },
+  messageFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginTop: 4,
+  },
   messageTime: {
     fontSize: 11,
     fontFamily: fonts.regular,
-    alignSelf: 'flex-end',
   },
   sentMessageTime: {
     color: 'rgba(28, 23, 23, 0.91)',
+    marginRight: 4,
   },
   receivedMessageTime: {
     color: colors.textSecondary,
+  },
+  readReceiptContainer: {
+    marginLeft: 2,
   },
   inputContainer: {
     paddingHorizontal: 20,
@@ -397,6 +813,53 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: colors.border,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 100,
+  },
+  typingIndicatorContainer: {
+    marginBottom: 12,
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+  },
+  typingBubble: {
+    backgroundColor: colors.itemBackground,
+    borderRadius: 16,
+    borderBottomLeftRadius: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  typingDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.primary,
+    marginHorizontal: 3,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 100,
+    paddingHorizontal: 40,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontFamily: fonts.semiBold,
+    color: colors.text,
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    fontFamily: fonts.regular,
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
 });
 

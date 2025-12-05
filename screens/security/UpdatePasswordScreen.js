@@ -1,37 +1,65 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, Alert } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import colors from '../../config/colors';
 import fonts from '../../config/fonts';
 import PasswordInput from '../../components/PasswordInput';
 import CustomButton from '../../components/CustomButton';
 import CustomHeader from '../../components/CustomHeader';
+import LoadingModal from '../../components/LoadingModal';
+import { getCurrentUser, resetPassword, reauthenticateUser } from '../../services/authService';
 
 const UpdatePasswordScreen = ({ navigation }) => {
   const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [sending, setSending] = useState(false);
 
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
     if (!currentPassword.trim()) {
       Alert.alert('Error', 'Please enter your current password');
       return;
     }
-    if (!newPassword.trim()) {
-      Alert.alert('Error', 'Please enter a new password');
-      return;
-    }
-    // if (newPassword.length < 6) {
-    //   Alert.alert('Error', 'Password must be at least 6 characters');
-    //   return;
-    // }
-    // if (newPassword !== confirmPassword) {
-    //   Alert.alert('Error', 'New passwords do not match');
-    //   return;
-    // }
 
-    // Navigate to verification screen
-    navigation.navigate('UpdatePasswordVerification');
+    try {
+      setSending(true);
+      const currentUser = getCurrentUser();
+      if (!currentUser || !currentUser.email) {
+        Alert.alert('Error', 'User not found');
+        return;
+      }
+
+      // Verify current password by reauthenticating
+      await reauthenticateUser(currentUser.email, currentPassword);
+
+      // Send Firebase password reset email
+      await resetPassword(currentUser.email);
+      
+      Alert.alert(
+        'Password Reset Email Sent',
+        `A password reset link has been sent to ${currentUser.email}.\n\nPlease check your email inbox and click the link to reset your password.`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              navigation.goBack();
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Error sending password reset email:', error);
+      let errorMessage = 'Failed to send password reset email. Please try again.';
+      
+      if (error.code === 'auth/wrong-password') {
+        errorMessage = 'Incorrect current password. Please try again.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Invalid email address.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -54,7 +82,7 @@ const UpdatePasswordScreen = ({ navigation }) => {
           {/* Title and Subtitle */}
           <View style={styles.titleContainer}>
             <Text style={styles.subtitle}>
-              Update your password to keep your account secure.
+              Enter your current password to receive a password reset link via email.
             </Text>
           </View>
 
@@ -66,30 +94,20 @@ const UpdatePasswordScreen = ({ navigation }) => {
               value={currentPassword}
               onChangeText={setCurrentPassword}
             />
-
-            <PasswordInput
-              label="Enter Your New Password"
-              placeholder="Enter Your New Password"
-              value={newPassword}
-              onChangeText={setNewPassword}
-            />
-
-            <PasswordInput
-              label="Confirm Your New Password"
-              placeholder="Confirm Your New Password"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-            />
           </View>
 
           {/* Update Button */}
           <CustomButton
-            text="Update Password"
+            text={sending ? "Sending Email..." : "Send Reset Link"}
             onPress={handleUpdate}
             style={styles.updateButton}
+            disabled={sending}
           />
         </ScrollView>
       </View>
+      
+      {/* Loading Modal */}
+      <LoadingModal visible={sending} />
     </KeyboardAvoidingView>
   );
 };

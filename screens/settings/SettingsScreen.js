@@ -88,12 +88,13 @@ const SettingsScreen = ({ navigation }) => {
         <View style={styles.blockAccountSection}>
           <SettingItem
             SvgIcon={ProfileDeleteIcon}
-            title="Block Account"
+            title="Delete Account"
             subtitle="Suspend Account"
             onPress={handleBlockAccount}
             showBorder={false}
           />
         </View>
+
 
         {/* Spacer to push logout to bottom */}
         <View style={styles.spacer} />

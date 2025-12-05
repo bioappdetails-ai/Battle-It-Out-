@@ -21,6 +21,7 @@ import LoginScreen from '../screens/auth/LoginScreen';
 import SignupScreen from '../screens/auth/SignupScreen';
 import VerificationScreen from '../screens/auth/VerificationScreen';
 import ProfileCreationScreen from '../screens/auth/ProfileCreationScreen';
+import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
 
 // Main App Screens
 import HomeScreen from '../screens/main/HomeScreen';
@@ -33,11 +34,13 @@ import MessageDetailsScreen from '../screens/main/MessageDetailsScreen';
 import UserProfileScreen from '../screens/main/UserProfileScreen';
 import ChallengeScreen from '../screens/main/ChallengeScreen';
 import BattleViewScreen from '../screens/main/BattleViewScreen';
+import SearchScreen from '../screens/main/SearchScreen';
 
 // Settings Screens
 import SettingsScreen from '../screens/settings/SettingsScreen';
 import SecurityScreen from '../screens/settings/SecurityScreen';
 import BlockAccountScreen from '../screens/settings/BlockAccountScreen';
+import BlockAccountVerificationScreen from '../screens/settings/BlockAccountVerificationScreen';
 import UpdateProfileScreen from '../screens/settings/UpdateProfileScreen';
 
 // Security Screens
@@ -161,11 +164,13 @@ const AppNavigator = () => {
         <Stack.Screen name="Splash" component={SplashScreen} />
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Signup" component={SignupScreen} />
+        <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
         <Stack.Screen name="Verification" component={VerificationScreen} />
         <Stack.Screen name="ProfileCreation" component={ProfileCreationScreen} />
         
         {/* Main App */}
         <Stack.Screen name="Main" component={MainTabs} />
+        <Stack.Screen name="Search" component={SearchScreen} />
         <Stack.Screen name="Inbox" component={InboxScreen} />
         <Stack.Screen name="MessageDetails" component={MessageDetailsScreen} />
         <Stack.Screen name="UserProfile" component={UserProfileScreen} />
@@ -179,6 +184,7 @@ const AppNavigator = () => {
         <Stack.Screen name="UpdateEmailVerification" component={UpdateEmailVerificationScreen} />
         <Stack.Screen name="UpdateProfile" component={UpdateProfileScreen} />
         <Stack.Screen name="BlockAccount" component={BlockAccountScreen} />
+        <Stack.Screen name="BlockAccountVerification" component={BlockAccountVerificationScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

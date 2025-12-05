@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "BattleItOut",
-    "slug": "BattleItOut",
+    "name": "battleitout",
+    "slug": "battleitout",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/logo.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
@@ -13,17 +13,124 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.battleitout.app",
+      "buildNumber": "1.0.0",
+      "infoPlist": {
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "com.battleitout.app",
+              "com.googleusercontent.apps.907613423588-e9ev9rrm5qaqn7ohco38ki23uq920f6f"
+            ]
+          },
+          {
+            "CFBundleURLSchemes": [
+              "fbYOUR_FACEBOOK_APP_ID"
+            ]
+          },
+          {
+            "CFBundleURLSchemes": [
+              "com.battleitout.app",
+              "com.googleusercontent.apps.907613423588-e9ev9rrm5qaqn7ohco38ki23uq920f6f"
+            ]
+          },
+          {
+            "CFBundleURLSchemes": [
+              "fbYOUR_FACEBOOK_APP_ID"
+            ]
+          }
+        ],
+        "CFBundleURLName": "com.battleitout.app",
+        "LSApplicationQueriesSchemes": [
+          "googlechrome",
+          "googlechromes",
+          "fbapi",
+          "fb-messenger-share-api",
+          "fbauth2",
+          "fbshareextension",
+          "googlechrome",
+          "googlechromes",
+          "fbapi",
+          "fb-messenger-share-api",
+          "fbauth2",
+          "fbshareextension"
+        ],
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "config": {
+        "googleSignIn": {
+          "reservedClientId": "907613423588-e9ev9rrm5qaqn7ohco38ki23uq920f6f.apps.googleusercontent.com"
+        }
+      },
+      "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
+      "package": "com.battleitout.app",
+      "versionCode": 1,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/logo.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "RECORD_AUDIO",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "*.battleitout.app",
+              "pathPrefix": "/"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ],
+      "googleServicesFile": "./google-services.json"
     },
+    "scheme": "battleitout",
     "web": {
-      "favicon": "./assets/favicon.png"
-    }
+      "favicon": "./assets/logo.png"
+    },
+    "notification": {
+      "icon": "./assets/home/Header.png",
+      "color": "#7594DC",
+      "iosDisplayInForeground": true,
+      "androidMode": "default",
+      "androidCollapsedTitle": "#{unread_notifications} new notifications",
+      "sounds": []
+    },
+    "plugins": [
+      "expo-dev-client",
+      "@react-native-google-signin/google-signin",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/home/Header.png",
+          "color": "#7594DC",
+          "sounds": []
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "ab9fb6f4-804a-48b8-957d-c6b77c970b55"
+      }
+    },
+    "owner": "abdmghl122"
   }
 }

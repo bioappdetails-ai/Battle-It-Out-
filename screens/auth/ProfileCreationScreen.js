@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import colors from '../../config/colors';
@@ -7,12 +7,29 @@ import fonts from '../../config/fonts';
 import CustomTextInput from '../../components/CustomTextInput';
 import CustomButton from '../../components/CustomButton';
 import CustomHeader from '../../components/CustomHeader';
+import LoadingModal from '../../components/LoadingModal';
+import { getCurrentUser, updateUserProfile } from '../../services/authService';
+import { createDocument } from '../../services/firestoreService';
+import { uploadProfilePicture } from '../../services/cloudinaryService';
+import { generateUserId } from '../../utils/uuid';
+import { COLLECTIONS } from '../../services/firestoreService';
 
-const ProfileCreationScreen = ({ navigation }) => {
+const ProfileCreationScreen = ({ navigation, route }) => {
   const [profileImage, setProfileImage] = useState(null);
   const [displayName, setDisplayName] = useState('');
   const [userName, setUserName] = useState('');
   const [profession, setProfession] = useState('');
+  const [loading, setLoading] = useState(false);
+  
+  // Get userId from route params or current user
+  const userId = route?.params?.userId || getCurrentUser()?.uid;
+  
+  // Log for debugging
+  React.useEffect(() => {
+    console.log('📝 ProfileCreationScreen - userId:', userId);
+    console.log('📝 ProfileCreationScreen - route params:', route?.params);
+    console.log('📝 ProfileCreationScreen - current user:', getCurrentUser()?.uid);
+  }, [userId, route?.params]);
 
   const requestImagePermission = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -39,7 +56,7 @@ const ProfileCreationScreen = ({ navigation }) => {
     }
   };
 
-  const handleComplete = () => {
+  const handleComplete = async () => {
     if (!displayName.trim()) {
       Alert.alert('Error', 'Please enter your display name');
       return;
@@ -53,14 +70,81 @@ const ProfileCreationScreen = ({ navigation }) => {
       return;
     }
 
-    // Handle profile creation logic here
-    console.log('Profile Created:', {
-      profileImage,
-      displayName,
-      userName,
-      profession,
-    });
-    navigation.replace('Main');
+    if (!userId) {
+      Alert.alert('Error', 'User ID not found. Please sign up again.');
+      navigation.replace('Signup');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      let profileImageUrl = null;
+      
+      // Upload profile image if provided
+      if (profileImage) {
+        try {
+          console.log('📤 Uploading profile image to Cloudinary...');
+          console.log('📤 Image URI:', profileImage);
+          console.log('📤 User ID:', userId);
+          
+          const uploadResult = await uploadProfilePicture(profileImage, userId);
+          profileImageUrl = uploadResult.url;
+          
+          console.log('✅ Profile image uploaded successfully!');
+          console.log('✅ Cloudinary URL:', profileImageUrl);
+          console.log('✅ Public ID:', uploadResult.publicId);
+        } catch (uploadError) {
+          console.error('❌ Profile image upload error:', uploadError);
+          console.error('❌ Error details:', JSON.stringify(uploadError, null, 2));
+          Alert.alert('Warning', 'Profile image upload failed, but continuing with profile creation.');
+        }
+      } else {
+        console.log('ℹ️ No profile image provided, skipping upload');
+      }
+
+      // Update Firebase Auth profile
+      await updateUserProfile(displayName.trim(), profileImageUrl);
+
+      // Create user document in Firestore with UUID
+      const userData = {
+        id: userId,
+        email: getCurrentUser()?.email || '',
+        displayName: displayName.trim(),
+        userName: userName.trim().toLowerCase(),
+        profession: profession.trim(),
+        profileImage: profileImageUrl, // Cloudinary URL stored here
+        battlesWon: 0,
+        battlesLost: 0,
+        totalBattles: 0,
+        followers: 0,
+        following: 0,
+      };
+
+      console.log('📝 Saving user data to Firestore...');
+      console.log('📝 User data:', JSON.stringify(userData, null, 2));
+      console.log('📝 Profile Image URL:', profileImageUrl);
+      
+      const documentId = await createDocument(COLLECTIONS.USERS, userData, userId);
+      console.log('✅ User profile created in Firestore with ID:', documentId);
+      console.log('✅ Profile image URL stored in Firestore:', profileImageUrl);
+
+      // Navigate to main app
+      navigation.replace('Main');
+    } catch (error) {
+      console.error('❌ Profile Creation Error:', error);
+      console.error('❌ Error details:', JSON.stringify(error, null, 2));
+      
+      let errorMessage = 'Failed to create profile. Please try again.';
+      if (error.code) {
+        errorMessage = `Firestore error (${error.code}): ${error.message || 'Unknown error'}`;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleBack = () => {
@@ -135,11 +219,15 @@ const ProfileCreationScreen = ({ navigation }) => {
 
         {/* Complete Button */}
         <CustomButton
-          text="Complete"
+          text={loading ? 'Creating Profile...' : 'Complete'}
           onPress={handleComplete}
           style={styles.completeButton}
+          disabled={loading}
         />
       </ScrollView>
+
+      {/* Loading Modal */}
+      <LoadingModal visible={loading} />
     </KeyboardAvoidingView>
   );
 };

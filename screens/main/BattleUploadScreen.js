@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,15 +17,26 @@ import fonts from '../../config/fonts';
 import CustomHeader from '../../components/CustomHeader';
 import CustomTextInput from '../../components/CustomTextInput';
 import CustomButton from '../../components/CustomButton';
+import AddCategoryModal from '../../components/AddCategoryModal';
 import UploadSvg from '../../assets/upload.svg';
+import {
+  uploadVideo,
+} from '../../services/cloudinaryService';
+import { createDocument, COLLECTIONS } from '../../services/firestoreService';
+import { getCurrentUser } from '../../services/authService';
+import { generateUUID } from '../../utils/uuid';
 
 const BattleUploadScreen = ({ navigation }) => {
   const [selectedVideo, setSelectedVideo] = useState(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Music');
-
-  const categories = [
+  const [savingBattle, setSavingBattle] = useState(false);
+  const [videoUploadProgress, setVideoUploadProgress] = useState(0);
+  const [uploadedVideoInfo, setUploadedVideoInfo] = useState(null);
+  const progressAnimationIntervalRef = useRef(null);
+  const [isAddCategoryModalVisible, setIsAddCategoryModalVisible] = useState(false);
+  const [categories, setCategories] = useState([
     'Music',
     'Singing',
     'Writing',
@@ -36,7 +47,17 @@ const BattleUploadScreen = ({ navigation }) => {
     'Traveling',
     'Racing',
     'Swimming',
-  ];
+  ]);
+
+  // Cleanup interval on unmount
+  useEffect(() => {
+    return () => {
+      if (progressAnimationIntervalRef.current) {
+        clearInterval(progressAnimationIntervalRef.current);
+        progressAnimationIntervalRef.current = null;
+      }
+    };
+  }, []);
 
   const requestVideoPermission = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -62,11 +83,86 @@ const BattleUploadScreen = ({ navigation }) => {
     });
 
     if (!result.canceled && result.assets[0]) {
-      setSelectedVideo(result.assets[0]);
+      const asset = result.assets[0];
+      setSelectedVideo(asset);
+      setUploadedVideoInfo(null);
+      await uploadSelectedVideo(asset);
     }
   };
 
-  const handleUpload = () => {
+  const uploadSelectedVideo = async (videoAsset) => {
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
+      Alert.alert('Error', 'Please log in to upload videos.');
+      return;
+    }
+
+    // Clear any existing animation interval
+    if (progressAnimationIntervalRef.current) {
+      clearInterval(progressAnimationIntervalRef.current);
+      progressAnimationIntervalRef.current = null;
+    }
+
+    try {
+      setVideoUploadProgress(0);
+      const folder = `battleitout/videos/${currentUser.uid}`;
+
+      const uploadResult = await uploadVideo(videoAsset.uri, folder, {
+        onProgress: (progress) => {
+          if (progress >= 0) {
+            // Cap progress at 70% during actual upload
+            const clamped = Math.min(Math.max(progress, 0), 0.7);
+            setVideoUploadProgress(clamped);
+          }
+        },
+      });
+
+      // Upload complete, now animate from 70% to 100% over 3 seconds
+      const startProgress = 0.7;
+      const endProgress = 1.0;
+      const duration = 3000; // 3 seconds
+      const steps = 60; // Update 60 times for smooth animation
+      const stepDuration = duration / steps;
+      const stepIncrement = (endProgress - startProgress) / steps;
+      
+      let currentProgress = startProgress;
+      let stepCount = 0;
+
+      progressAnimationIntervalRef.current = setInterval(() => {
+        stepCount++;
+        currentProgress = startProgress + (stepIncrement * stepCount);
+        
+        if (currentProgress >= endProgress || stepCount >= steps) {
+          setVideoUploadProgress(1.0);
+          // Set uploadedVideoInfo after animation completes to show "Ready"
+          setUploadedVideoInfo(uploadResult);
+          if (progressAnimationIntervalRef.current) {
+            clearInterval(progressAnimationIntervalRef.current);
+            progressAnimationIntervalRef.current = null;
+          }
+        } else {
+          setVideoUploadProgress(currentProgress);
+        }
+      }, stepDuration);
+    } catch (error) {
+      console.error('Video upload failed:', error);
+      Alert.alert(
+        'Video Upload Failed',
+        error.message || 'Unable to upload video. Please try again.'
+      );
+      setUploadedVideoInfo(null);
+      setSelectedVideo(null);
+      setVideoUploadProgress(0);
+      
+      // Clear animation interval on error
+      if (progressAnimationIntervalRef.current) {
+        clearInterval(progressAnimationIntervalRef.current);
+        progressAnimationIntervalRef.current = null;
+      }
+    }
+  };
+
+  const handleUpload = async () => {
     if (!selectedVideo) {
       Alert.alert('Error', 'Please select a video to upload');
       return;
@@ -80,17 +176,64 @@ const BattleUploadScreen = ({ navigation }) => {
       return;
     }
 
-    // Handle upload logic here
-    console.log('Uploading battle:', {
-      video: selectedVideo,
-      title,
-      description,
-      category: selectedCategory,
-    });
+    if (!uploadedVideoInfo) {
+      Alert.alert('Video Processing', 'Please wait for the video upload to finish.');
+      return;
+    }
 
-    Alert.alert('Success', 'Battle uploaded successfully!', [
-      { text: 'OK', onPress: () => navigation.navigate('Main') },
-    ]);
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
+      Alert.alert('Error', 'You need to be logged in to upload a battle.');
+      return;
+    }
+
+    try {
+      setSavingBattle(true);
+      const videoId = generateUUID();
+
+      const videoData = {
+        title: title.trim(),
+        description: description.trim(),
+        category: selectedCategory,
+        videoUrl: uploadedVideoInfo.url,
+        thumbnailUrl: uploadedVideoInfo.thumbnailUrl,
+        publicId: uploadedVideoInfo.publicId,
+        width: uploadedVideoInfo.width,
+        height: uploadedVideoInfo.height,
+        duration: uploadedVideoInfo.duration || selectedVideo.duration || null,
+        format: uploadedVideoInfo.format,
+        bytes: uploadedVideoInfo.bytes,
+        userId: currentUser.uid,
+        userEmail: currentUser.email || '',
+        userName: currentUser.displayName || currentUser.email || 'Unknown User',
+        status: 'active',
+        likes: 0,
+        views: 0,
+        commentsCount: 0,
+        source: 'mobile',
+      };
+
+      await createDocument(COLLECTIONS.VIDEOS, videoData, videoId);
+
+      Alert.alert('Success', 'Battle uploaded successfully!', [
+        { text: 'OK', onPress: () => navigation.navigate('Main') },
+      ]);
+
+      setSelectedVideo(null);
+      setTitle('');
+      setDescription('');
+      setSelectedCategory('Music');
+      setUploadedVideoInfo(null);
+      setVideoUploadProgress(0);
+    } catch (error) {
+      console.error('Battle upload failed:', error);
+      Alert.alert(
+        'Upload Failed',
+        error.message || 'Unable to upload battle video. Please try again.'
+      );
+    } finally {
+      setSavingBattle(false);
+    }
   };
 
   return (
@@ -98,7 +241,7 @@ const BattleUploadScreen = ({ navigation }) => {
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      <CustomHeader title="Battle Upload" navigation={navigation} />
+      <CustomHeader title="Video Upload" navigation={navigation} />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -119,17 +262,45 @@ const BattleUploadScreen = ({ navigation }) => {
                 resizeMode="cover"
               />
               <View style={styles.videoOverlay}>
-                <Ionicons
-                  name="play-circle"
-                  size={48}
-                  color={colors.textLight}
-                />
+                {uploadedVideoInfo ? (
+                  <>
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={48}
+                      color={colors.textLight}
+                    />
+                    <Text style={styles.uploadStatusText}>Ready</Text>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.uploadStatusText}>
+                      {`${Math.round(
+                        Math.min(Math.max(videoUploadProgress, 0), 1) * 100
+                      )}%`}
+                    </Text>
+                    <View style={styles.inlineProgressBar}>
+                      <View
+                        style={[
+                          styles.inlineProgressFill,
+                          {
+                            width: `${Math.round(
+                              Math.min(Math.max(videoUploadProgress, 0), 1) * 100
+                            )}%`,
+                          },
+                        ]}
+                      />
+                    </View>
+                    <Text style={styles.uploadHint}>Uploading...</Text>
+                  </>
+                )}
               </View>
               <TouchableOpacity
                 style={styles.removeVideoButton}
                 onPress={(e) => {
                   e.stopPropagation();
                   setSelectedVideo(null);
+                  setUploadedVideoInfo(null);
+                  setVideoUploadProgress(0);
                 }}
               >
                 <Ionicons name="close-circle" size={24} color={colors.text} />
@@ -196,7 +367,10 @@ const BattleUploadScreen = ({ navigation }) => {
                 </Text>
               </TouchableOpacity>
             ))}
-            <TouchableOpacity style={styles.addCategoryButton}>
+            <TouchableOpacity
+              style={styles.addCategoryButton}
+              onPress={() => setIsAddCategoryModalVisible(true)}
+            >
               <Text style={styles.addCategoryText}>+ Add New</Text>
             </TouchableOpacity>
           </View>
@@ -204,11 +378,23 @@ const BattleUploadScreen = ({ navigation }) => {
 
         {/* Send Challenge Button */}
         <CustomButton
-          text="Upload"
+          text={savingBattle ? 'Saving...' : 'Upload'}
           onPress={handleUpload}
           style={styles.sendButton}
+          disabled={savingBattle}
         />
       </ScrollView>
+
+      {/* Add Category Modal */}
+      <AddCategoryModal
+        visible={isAddCategoryModalVisible}
+        onClose={() => setIsAddCategoryModalVisible(false)}
+        onAdd={(newCategory) => {
+          setCategories((prev) => [...prev, newCategory]);
+          setSelectedCategory(newCategory);
+        }}
+        existingCategories={categories}
+      />
     </KeyboardAvoidingView>
   );
 };
@@ -348,6 +534,30 @@ const styles = StyleSheet.create({
   sendButton: {
     backgroundColor: colors.primary,
     marginTop: 8,
+  },
+  uploadStatusText: {
+    color: colors.textLight,
+    fontSize: 28,
+    fontFamily: fonts.semiBold,
+    textAlign: 'center',
+  },
+  uploadHint: {
+    color: colors.textLight,
+    fontSize: 12,
+    marginTop: 8,
+    fontFamily: fonts.regular,
+  },
+  inlineProgressBar: {
+    width: '80%',
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    overflow: 'hidden',
+    marginTop: 8,
+  },
+  inlineProgressFill: {
+    height: '100%',
+    backgroundColor: colors.textLight,
   },
 });
 

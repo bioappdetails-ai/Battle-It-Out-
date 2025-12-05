@@ -1,0 +1,108 @@
+<svg width="1920" height="1080" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Main gradient background -->
+    <linearGradient id="mainGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#893264;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#253656;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Shadow filter for depth -->
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="8"/>
+      <feOffset dx="0" dy="4" result="offsetblur"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.3"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <!-- Soft shadow for shapes -->
+    <filter id="softShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="12"/>
+      <feOffset dx="0" dy="6" result="offsetblur"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.2"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <!-- Glow effect -->
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Background gradient -->
+  <rect width="1920" height="1080" fill="url(#mainGradient)"/>
+  
+  <!-- Abstract geometric shapes - positioned around edges to leave center clear -->
+  
+  <!-- Large circle in top-left corner (light pink) -->
+  <circle cx="150" cy="150" r="120" fill="#FCDEDC" opacity="0.15" filter="url(#softShadow)"/>
+  <circle cx="150" cy="150" r="80" fill="#FCDEDC" opacity="0.1"/>
+  
+  <!-- Hexagon pattern top-right (light blue) -->
+  <polygon points="1700,80 1800,80 1850,150 1800,220 1700,220 1650,150" 
+           fill="#7594DC" opacity="0.12" filter="url(#softShadow)"/>
+  <polygon points="1720,100 1780,100 1810,150 1780,200 1720,200 1690,150" 
+           fill="#7594DC" opacity="0.08"/>
+  
+  <!-- Triangle bottom-left (light pink) -->
+  <polygon points="200,950 350,950 275,800" 
+           fill="#FCDEDC" opacity="0.18" filter="url(#softShadow)"/>
+  <polygon points="220,930 330,930 275,820" 
+           fill="#FCDEDC" opacity="0.1"/>
+  
+  <!-- Diamond shapes bottom-right (light blue) -->
+  <polygon points="1650,900 1750,900 1700,1000 1600,1000" 
+           fill="#7594DC" opacity="0.15" filter="url(#softShadow)"/>
+  <polygon points="1680,920 1720,920 1700,980 1660,980" 
+           fill="#7594DC" opacity="0.08"/>
+  
+  <!-- Floating circles (light blue) -->
+  <circle cx="400" cy="300" r="60" fill="#7594DC" opacity="0.1" filter="url(#softShadow)"/>
+  <circle cx="1520" cy="400" r="50" fill="#7594DC" opacity="0.12" filter="url(#softShadow)"/>
+  
+  <!-- Floating circles (light pink) -->
+  <circle cx="500" cy="750" r="45" fill="#FCDEDC" opacity="0.12" filter="url(#softShadow)"/>
+  <circle cx="1420" cy="800" r="55" fill="#FCDEDC" opacity="0.1" filter="url(#softShadow)"/>
+  
+  <!-- Abstract lines/connections (light blue) -->
+  <line x1="300" y1="200" x2="500" y2="250" stroke="#7594DC" stroke-width="2" opacity="0.15" filter="url(#glow)"/>
+  <line x1="1400" y1="300" x2="1600" y2="350" stroke="#7594DC" stroke-width="2" opacity="0.12" filter="url(#glow)"/>
+  
+  <!-- Abstract lines/connections (light pink) -->
+  <line x1="250" y1="850" x2="450" y2="900" stroke="#FCDEDC" stroke-width="2" opacity="0.15" filter="url(#glow)"/>
+  <line x1="1500" y1="750" x2="1700" y2="800" stroke="#FCDEDC" stroke-width="2" opacity="0.12" filter="url(#glow)"/>
+  
+  <!-- Small decorative dots pattern -->
+  <circle cx="100" cy="500" r="8" fill="#7594DC" opacity="0.2"/>
+  <circle cx="1820" cy="600" r="8" fill="#FCDEDC" opacity="0.2"/>
+  <circle cx="120" cy="700" r="6" fill="#7594DC" opacity="0.18"/>
+  <circle cx="1800" cy="500" r="6" fill="#FCDEDC" opacity="0.18"/>
+  
+  <!-- Subtle grid pattern overlay (very faint) -->
+  <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#7594DC" stroke-width="0.5" opacity="0.05"/>
+  </pattern>
+  <rect width="1920" height="1080" fill="url(#grid)"/>
+  
+  <!-- Center area highlight (subtle radial gradient for focus) -->
+  <radialGradient id="centerHighlight" cx="50%" cy="50%">
+    <stop offset="0%" style="stop-color:#FFFFFF;stop-opacity:0"/>
+    <stop offset="60%" style="stop-color:#FFFFFF;stop-opacity:0"/>
+    <stop offset="100%" style="stop-color:#FFFFFF;stop-opacity:0.03"/>
+  </radialGradient>
+  <rect x="400" y="200" width="1120" height="680" rx="20" fill="url(#centerHighlight)"/>
+</svg>
+

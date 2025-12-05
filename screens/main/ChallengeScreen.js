@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Dimensions,
   Platform,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -18,18 +19,28 @@ import fonts from "../../config/fonts";
 import CustomHeader from "../../components/CustomHeader";
 import CustomTextInput from "../../components/CustomTextInput";
 import CustomButton from "../../components/CustomButton";
+import AddCategoryModal from "../../components/AddCategoryModal";
 import UploadSvg from "../../assets/upload.svg";
+import { uploadVideo } from "../../services/cloudinaryService";
+import { createDocument, getDocument, COLLECTIONS } from "../../services/firestoreService";
+import { getCurrentUser } from "../../services/authService";
+import { generateUUID } from "../../utils/uuid";
+import { serverTimestamp } from "firebase/firestore";
 
 const SECTION_HEIGHT = Dimensions.get("window").height * 0.3;
 
 const ChallengeScreen = ({ route, navigation }) => {
-  const { post } = route.params || {};
+  const { post, video } = route.params || {};
   const [selectedVideo, setSelectedVideo] = useState(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("Music");
-
-  const categories = [
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadedVideoInfo, setUploadedVideoInfo] = useState(null);
+  const progressAnimationIntervalRef = useRef(null);
+  const [isAddCategoryModalVisible, setIsAddCategoryModalVisible] = useState(false);
+  const [categories, setCategories] = useState([
     "Music",
     "Singing",
     "Writing",
@@ -40,7 +51,17 @@ const ChallengeScreen = ({ route, navigation }) => {
     "Traveling",
     "Racing",
     "Swimming",
-  ];
+  ]);
+
+  // Cleanup interval on unmount
+  useEffect(() => {
+    return () => {
+      if (progressAnimationIntervalRef.current) {
+        clearInterval(progressAnimationIntervalRef.current);
+        progressAnimationIntervalRef.current = null;
+      }
+    };
+  }, []);
 
   const requestVideoPermission = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -66,11 +87,86 @@ const ChallengeScreen = ({ route, navigation }) => {
     });
 
     if (!result.canceled && result.assets[0]) {
-      setSelectedVideo(result.assets[0]);
+      const asset = result.assets[0];
+      setSelectedVideo(asset);
+      setUploadedVideoInfo(null);
+      await uploadSelectedVideo(asset);
     }
   };
 
-  const handleUpload = () => {
+  const uploadSelectedVideo = async (videoAsset) => {
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
+      Alert.alert('Error', 'Please log in to upload videos.');
+      return;
+    }
+
+    // Clear any existing animation interval
+    if (progressAnimationIntervalRef.current) {
+      clearInterval(progressAnimationIntervalRef.current);
+      progressAnimationIntervalRef.current = null;
+    }
+
+    try {
+      setUploadProgress(0);
+      const folder = `battleitout/videos/${currentUser.uid}`;
+
+      const uploadResult = await uploadVideo(videoAsset.uri, folder, {
+        onProgress: (progress) => {
+          if (progress >= 0) {
+            // Cap progress at 70% during actual upload
+            const clamped = Math.min(Math.max(progress, 0), 0.7);
+            setUploadProgress(clamped);
+          }
+        },
+      });
+
+      // Upload complete, now animate from 70% to 100% over 3 seconds
+      const startProgress = 0.7;
+      const endProgress = 1.0;
+      const duration = 3000; // 3 seconds
+      const steps = 60; // Update 60 times for smooth animation
+      const stepDuration = duration / steps;
+      const stepIncrement = (endProgress - startProgress) / steps;
+      
+      let currentProgress = startProgress;
+      let stepCount = 0;
+
+      progressAnimationIntervalRef.current = setInterval(() => {
+        stepCount++;
+        currentProgress = startProgress + (stepIncrement * stepCount);
+        
+        if (currentProgress >= endProgress || stepCount >= steps) {
+          setUploadProgress(1.0);
+          if (progressAnimationIntervalRef.current) {
+            clearInterval(progressAnimationIntervalRef.current);
+            progressAnimationIntervalRef.current = null;
+          }
+        } else {
+          setUploadProgress(currentProgress);
+        }
+      }, stepDuration);
+
+      setUploadedVideoInfo(uploadResult);
+    } catch (error) {
+      console.error('Video upload failed:', error);
+      Alert.alert(
+        'Video Upload Failed',
+        error.message || 'Unable to upload video. Please try again.'
+      );
+      setUploadedVideoInfo(null);
+      setSelectedVideo(null);
+      setUploadProgress(0);
+      
+      // Clear animation interval on error
+      if (progressAnimationIntervalRef.current) {
+        clearInterval(progressAnimationIntervalRef.current);
+        progressAnimationIntervalRef.current = null;
+      }
+    }
+  };
+
+  const handleUpload = async () => {
     if (!selectedVideo) {
       Alert.alert("Error", "Please select a video to upload");
       return;
@@ -84,17 +180,148 @@ const ChallengeScreen = ({ route, navigation }) => {
       return;
     }
 
-    // Handle upload logic here
-    console.log("Uploading challenge:", {
-      video: selectedVideo,
-      title,
-      description,
-      category: selectedCategory,
-    });
+    if (!uploadedVideoInfo) {
+      Alert.alert("Video Processing", "Please wait for the video upload to finish.");
+      return;
+    }
 
-    Alert.alert("Success", "Challenge uploaded successfully!", [
-      { text: "OK", onPress: () => navigation.navigate("Main") },
-    ]);
+    if (!video || !post) {
+      Alert.alert("Error", "Original video information is missing.");
+      return;
+    }
+
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
+      Alert.alert("Error", "You need to be logged in to create a challenge.");
+      return;
+    }
+
+    try {
+      setUploading(true);
+
+      // Get original video owner's user profile
+      let originalVideoOwner = null;
+      try {
+        originalVideoOwner = await getDocument(COLLECTIONS.USERS, video.userId);
+      } catch (error) {
+        console.error("Error fetching original video owner:", error);
+      }
+
+      // Get current user's profile
+      let challengerProfile = null;
+      try {
+        challengerProfile = await getDocument(COLLECTIONS.USERS, currentUser.uid);
+      } catch (error) {
+        console.error("Error fetching challenger profile:", error);
+      }
+
+      // Create battle document
+      const battleId = generateUUID();
+      const battleData = {
+        // Original video (player1)
+        player1VideoId: video.id,
+        player1UserId: video.userId,
+        player1VideoUrl: video.videoUrl,
+        player1ThumbnailUrl: video.thumbnailUrl || video.videoThumbnail?.uri,
+        player1Title: video.title || post.caption || "",
+        player1Description: video.description || "",
+        player1UserName: originalVideoOwner?.userName || originalVideoOwner?.displayName || video.userName || "Unknown",
+        player1ProfileImage: originalVideoOwner?.profileImage || post.profileImage?.uri || null,
+        player1Votes: 0,
+        player1Views: video.views || 0,
+        player1Saves: 0,
+
+        // Challenge video (player2)
+        player2VideoId: null, // Will be set after creating video document
+        player2UserId: currentUser.uid,
+        player2VideoUrl: uploadedVideoInfo.url,
+        player2ThumbnailUrl: uploadedVideoInfo.thumbnailUrl,
+        player2Title: title.trim(),
+        player2Description: description.trim(),
+        player2UserName: challengerProfile?.userName || challengerProfile?.displayName || currentUser.displayName || "Unknown",
+        player2ProfileImage: challengerProfile?.profileImage || null,
+        player2Votes: 0,
+        player2Views: 0,
+        player2Saves: 0,
+
+        // Battle metadata
+        category: selectedCategory,
+        status: "pending", // pending, active, completed, expired - pending until accepted
+        totalVotes: 0,
+        createdAt: serverTimestamp(),
+        expiresAt: null, // Can be set to expire after a certain time
+        winnerId: null,
+        battleType: "challenge", // challenge, direct
+      };
+
+      // Create video document for the challenge video
+      const challengeVideoId = generateUUID();
+      const challengeVideoData = {
+        title: title.trim(),
+        description: description.trim(),
+        category: selectedCategory,
+        videoUrl: uploadedVideoInfo.url,
+        thumbnailUrl: uploadedVideoInfo.thumbnailUrl,
+        publicId: uploadedVideoInfo.publicId,
+        width: uploadedVideoInfo.width,
+        height: uploadedVideoInfo.height,
+        duration: uploadedVideoInfo.duration || selectedVideo.duration || null,
+        format: uploadedVideoInfo.format,
+        bytes: uploadedVideoInfo.bytes,
+        userId: currentUser.uid,
+        userEmail: currentUser.email || "",
+        userName: challengerProfile?.userName || challengerProfile?.displayName || currentUser.displayName || "Unknown",
+        status: "active",
+        likes: 0,
+        views: 0,
+        commentsCount: 0,
+        source: "mobile",
+        battleId: battleId, // Link to battle
+      };
+
+      // Create challenge video document
+      await createDocument(COLLECTIONS.VIDEOS, challengeVideoData, challengeVideoId);
+
+      // Update battle with challenge video ID
+      battleData.player2VideoId = challengeVideoId;
+
+      // Create battle document
+      await createDocument(COLLECTIONS.BATTLES, battleData, battleId);
+
+      // Create notification for the original video owner (player1)
+      try {
+        const { createNotification } = await import('../../services/notificationService');
+        if (video.userId && video.userId !== currentUser.uid) {
+          await createNotification(video.userId, 'battle_request', {
+            senderId: currentUser.uid,
+            battleId: battleId,
+          });
+        }
+      } catch (error) {
+        console.error('Error creating battle notification:', error);
+        // Don't fail the battle creation if notification creation fails
+      }
+
+      Alert.alert("Success", "Challenge created successfully!", [
+        { text: "OK", onPress: () => navigation.navigate("Main") },
+      ]);
+
+      // Reset form
+      setSelectedVideo(null);
+      setTitle("");
+      setDescription("");
+      setSelectedCategory("Music");
+      setUploadedVideoInfo(null);
+      setUploadProgress(0);
+    } catch (error) {
+      console.error("Challenge creation failed:", error);
+      Alert.alert(
+        "Upload Failed",
+        error.message || "Unable to create challenge. Please try again."
+      );
+    } finally {
+      setUploading(false);
+    }
   };
 
   return (
@@ -140,17 +367,45 @@ const ChallengeScreen = ({ route, navigation }) => {
                   resizeMode="cover"
                 />
                 <View style={styles.videoOverlay}>
-                  <Ionicons
-                    name="play-circle"
-                    size={32}
-                    color={colors.textLight}
-                  />
+                  {uploadedVideoInfo ? (
+                    <>
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={48}
+                        color={colors.textLight}
+                      />
+                      <Text style={styles.uploadStatusText}>Ready</Text>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={styles.uploadStatusText}>
+                        {`${Math.round(
+                          Math.min(Math.max(uploadProgress, 0), 1) * 100
+                          )}%`}
+                      </Text>
+                      <View style={styles.inlineProgressBar}>
+                        <View
+                          style={[
+                            styles.inlineProgressFill,
+                            {
+                              width: `${Math.round(
+                                Math.min(Math.max(uploadProgress, 0), 1) * 100
+                              )}%`,
+                            },
+                          ]}
+                        />
+                      </View>
+                      <Text style={styles.uploadHint}>Uploading...</Text>
+                    </>
+                  )}
                 </View>
                 <TouchableOpacity
                   style={styles.removeVideoButton}
                   onPress={(e) => {
                     e.stopPropagation();
                     setSelectedVideo(null);
+                    setUploadedVideoInfo(null);
+                    setUploadProgress(0);
                   }}
                 >
                   <Ionicons name="close-circle" size={20} color={colors.text} />
@@ -224,7 +479,10 @@ const ChallengeScreen = ({ route, navigation }) => {
                 </Text>
               </TouchableOpacity>
             ))}
-            <TouchableOpacity style={styles.addCategoryButton}>
+            <TouchableOpacity
+              style={styles.addCategoryButton}
+              onPress={() => setIsAddCategoryModalVisible(true)}
+            >
               <Text style={styles.addCategoryText}>+ Add New</Text>
             </TouchableOpacity>
           </View>
@@ -232,11 +490,23 @@ const ChallengeScreen = ({ route, navigation }) => {
 
         {/* Upload Button */}
         <CustomButton
-          text="Upload"
+          text={uploading ? "Creating Challenge..." : "Create Challenge"}
           onPress={handleUpload}
           style={styles.uploadButton}
+          disabled={uploading || !uploadedVideoInfo}
         />
       </ScrollView>
+
+      {/* Add Category Modal */}
+      <AddCategoryModal
+        visible={isAddCategoryModalVisible}
+        onClose={() => setIsAddCategoryModalVisible(false)}
+        onAdd={(newCategory) => {
+          setCategories((prev) => [...prev, newCategory]);
+          setSelectedCategory(newCategory);
+        }}
+        existingCategories={categories}
+      />
     </KeyboardAvoidingView>
   );
 };
@@ -407,6 +677,31 @@ const styles = StyleSheet.create({
   uploadButton: {
     backgroundColor: colors.primary,
     marginTop: 8,
+  },
+  uploadStatusText: {
+    color: colors.textLight,
+    fontSize: 24,
+    fontFamily: fonts.semiBold,
+    textAlign: "center",
+    marginTop: 8,
+  },
+  uploadHint: {
+    color: colors.textLight,
+    fontSize: 12,
+    marginTop: 8,
+    fontFamily: fonts.regular,
+  },
+  inlineProgressBar: {
+    width: "80%",
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "rgba(255,255,255,0.3)",
+    overflow: "hidden",
+    marginTop: 8,
+  },
+  inlineProgressFill: {
+    height: "100%",
+    backgroundColor: colors.textLight,
   },
 });
 

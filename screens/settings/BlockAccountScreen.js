@@ -1,32 +1,56 @@
 import React, { useState } from 'react';
-import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../../config/colors';
 import fonts from '../../config/fonts';
 import CustomTextInput from '../../components/CustomTextInput';
 import CustomButton from '../../components/CustomButton';
 import CustomHeader from '../../components/CustomHeader';
+import { getCurrentUser } from '../../services/authService';
+import { sendOTPToUser } from '../../services/otpService';
 
 const BlockAccountScreen = ({ navigation }) => {
   const [reason, setReason] = useState('');
+  const [sending, setSending] = useState(false);
 
-  const handleGoodBye = () => {
-    Alert.alert(
-      'Block Account',
-      'Are you sure you want to block your account? This action cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Block', 
-          style: 'destructive', 
-          onPress: () => {
-            console.log('Account blocked. Reason:', reason);
-            // Navigate back or to login screen
-            navigation.replace('Login');
+  const handleGoodBye = async () => {
+    if (!reason.trim()) {
+      Alert.alert('Error', 'Please provide a reason for blocking your account');
+      return;
+    }
+
+    try {
+      setSending(true);
+      const currentUser = getCurrentUser();
+      if (!currentUser || !currentUser.email) {
+        Alert.alert('Error', 'User not found');
+        return;
+      }
+
+      // Send OTP to user's registered email via Resend API
+      console.log('📧 Initiating OTP send for account blocking...');
+      const { otpId } = await sendOTPToUser('block_account');
+      console.log('✅ OTP sent successfully, OTP ID:', otpId);
+      
+      Alert.alert(
+        'Verification Code Sent',
+        `A 4-digit verification code has been sent to ${currentUser.email}.\n\nPlease check your email inbox to get the verification code.`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              // Navigate to verification screen
+              navigation.navigate('BlockAccountVerification', { reason });
+            }
           }
-        },
-      ]
-    );
+        ]
+      );
+    } catch (error) {
+      console.error('Error sending OTP:', error);
+      Alert.alert('Error', 'Failed to send verification code. Please try again.');
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -79,9 +103,10 @@ const BlockAccountScreen = ({ navigation }) => {
 
           {/* Good Bye Button */}
           <CustomButton
-            text="Good Bye!"
+            text={sending ? "Sending Code..." : "Good Bye!"}
             onPress={handleGoodBye}
             style={styles.goodByeButton}
+            disabled={sending}
           />
         </ScrollView>
       </View>

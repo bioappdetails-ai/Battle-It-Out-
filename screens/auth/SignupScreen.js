@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
 import colors from '../../config/colors';
 import fonts from '../../config/fonts';
 import CustomTextInput from '../../components/CustomTextInput';
@@ -7,25 +7,77 @@ import PasswordInput from '../../components/PasswordInput';
 import CustomButton from '../../components/CustomButton';
 import SocialButton from '../../components/SocialButton';
 import Checkbox from '../../components/Checkbox';
+import LoadingModal from '../../components/LoadingModal';
+import { registerUser, sendVerificationEmail } from '../../services/authService';
 
 const SignupScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [acceptTerms, setAcceptTerms] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleSignUp = () => {
-    // Handle signup logic here
-    if (!acceptTerms) {
-      alert('Please accept Terms & Conditions');
+  const handleSignUp = async () => {
+    if (!email.trim()) {
+      Alert.alert('Error', 'Please enter your email address');
+      return;
+    }
+    if (!password.trim()) {
+      Alert.alert('Error', 'Please enter a password');
+      return;
+    }
+    if (password.length < 6) {
+      Alert.alert('Error', 'Password must be at least 6 characters');
       return;
     }
     if (password !== confirmPassword) {
-      alert('Passwords do not match');
+      Alert.alert('Error', 'Passwords do not match');
       return;
     }
-    console.log('Sign Up:', { email, password });
-    navigation.navigate('Verification');
+    if (!acceptTerms) {
+      Alert.alert('Error', 'Please accept Terms & Conditions');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      console.log('📝 Starting user registration...');
+      const userCredential = await registerUser(email.trim(), password);
+      console.log('✅ User registered in Firebase Auth:', userCredential.user.uid);
+      
+      // Send verification email
+      try {
+        await sendVerificationEmail();
+        console.log('✅ Verification email sent');
+      } catch (verificationError) {
+        console.log('⚠️ Verification email error:', verificationError);
+        // Continue even if verification email fails
+      }
+
+      // Navigate to profile creation
+      console.log('📝 Navigating to ProfileCreation...');
+      navigation.replace('ProfileCreation', {
+        userId: userCredential.user.uid,
+        email: userCredential.user.email,
+      });
+    } catch (error) {
+      console.error('Signup Error:', error);
+      let errorMessage = 'Sign up failed. Please try again.';
+      
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = 'This email is already registered. Please login instead.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Invalid email address.';
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = 'Password is too weak. Please use a stronger password.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Sign Up Error', errorMessage);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleLogin = () => {
@@ -33,13 +85,11 @@ const SignupScreen = ({ navigation }) => {
   };
 
   const handleGoogleSignUp = () => {
-    // Handle Google signup logic here
-    console.log('Google Sign Up');
+    Alert.alert('Coming Soon', 'Google Sign-Up will be available soon.');
   };
 
   const handleFacebookSignUp = () => {
-    // Handle Facebook signup logic here
-    console.log('Facebook Sign Up');
+    Alert.alert('Coming Soon', 'Facebook Sign-Up will be available soon.');
   };
 
   return (
@@ -78,6 +128,7 @@ const SignupScreen = ({ navigation }) => {
             text="Google"
             onPress={handleGoogleSignUp}
             style={styles.socialButton}
+            disabled={loading}
           />
           <View style={styles.socialSpacer} />
           <SocialButton
@@ -91,6 +142,7 @@ const SignupScreen = ({ navigation }) => {
             text="Facebook"
             onPress={handleFacebookSignUp}
             style={styles.socialButton}
+            disabled={loading}
           />
         </View>
 
@@ -130,9 +182,10 @@ const SignupScreen = ({ navigation }) => {
 
         {/* Sign Up Button */}
         <CustomButton
-          text="Sign Up"
+          text={loading ? 'Creating Account...' : 'Sign Up'}
           onPress={handleSignUp}
           style={styles.signUpButton}
+          disabled={loading}
         />
 
         {/* Login Link */}
@@ -143,6 +196,9 @@ const SignupScreen = ({ navigation }) => {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Loading Modal */}
+      <LoadingModal visible={loading} />
     </KeyboardAvoidingView>
   );
 };
