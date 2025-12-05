@@ -35,7 +35,6 @@ import { trackViewWithDuration } from '../../services/viewService';
 import { generateUUID } from '../../utils/uuid';
 import { serverTimestamp, increment } from 'firebase/firestore';
 import { isBattleExpired, completeBattle } from '../../services/battleService';
-import { isBattleExpired, completeBattle } from '../../services/battleService';
 
 const { width, height } = Dimensions.get('window');
 

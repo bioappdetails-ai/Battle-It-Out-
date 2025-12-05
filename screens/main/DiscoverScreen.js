@@ -368,7 +368,7 @@ const DiscoverScreen = ({ navigation }) => {
   // Fetch battles when screen is focused
   useFocusEffect(
     React.useCallback(() => {
-      fetchBattles();
+      fetchBattles(activeCategory);
       fetchSavedVideos();
       
       // Cleanup: Pause video when leaving screen
@@ -378,7 +378,7 @@ const DiscoverScreen = ({ navigation }) => {
         }
         setPaused(true);
       };
-    }, [])
+    }, [activeCategory])
   );
 
   useEffect(() => {
@@ -974,6 +974,17 @@ const DiscoverScreen = ({ navigation }) => {
     );
   };
 
+  // Available categories
+  const categories = ['New', 'Trending', 'Game Battles', 'Music', 'Singing', 'Writing', 'Art', 'Sports', 'Gym', 'Food', 'Traveling', 'Racing', 'Swimming'];
+
+  const handleCategoryChange = (category) => {
+    setActiveCategory(category);
+    setCurrentBattleIndex(0);
+    setCurrentPlayer(1);
+    setPaused(false);
+    fetchBattles(category);
+  };
+
   if (battleData.length === 0 && !loading) {
     return (
       <View style={[styles.container, styles.emptyContainer]}>
@@ -988,6 +999,34 @@ const DiscoverScreen = ({ navigation }) => {
     <GestureHandlerRootView style={styles.container}>
       <StatusBar barStyle="light-content" />
       <View style={styles.container}>
+        {/* Category Filter */}
+        <View style={styles.categoryContainer}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoryScrollContent}
+          >
+            {categories.map((category) => (
+              <TouchableOpacity
+                key={category}
+                style={[
+                  styles.categoryButton,
+                  activeCategory === category && styles.categoryButtonActive,
+                ]}
+                onPress={() => handleCategoryChange(category)}
+              >
+                <Text
+                  style={[
+                    styles.categoryButtonText,
+                    activeCategory === category && styles.categoryButtonTextActive,
+                  ]}
+                >
+                  {category}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
         <PagerView
           ref={pagerRef}
           style={styles.pagerView}
@@ -1103,6 +1142,7 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    backgroundColor: colors.background,
   },
   categoryScrollContent: {
     paddingHorizontal: 20,

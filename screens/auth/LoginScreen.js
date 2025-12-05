@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
+import NetInfo from '@react-native-community/netinfo';
 import colors from '../../config/colors';
 import fonts from '../../config/fonts';
 import CustomTextInput from '../../components/CustomTextInput';
@@ -16,25 +17,29 @@ const LoginScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
+  const checkInternetConnection = async () => {
+    const netInfo = await NetInfo.fetch();
+    return netInfo.isConnected && netInfo.isInternetReachable;
+  };
+
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
       Alert.alert('Error', 'Please enter both email and password');
       return;
     }
 
+    const isConnected = await checkInternetConnection();
+    if (!isConnected) {
+      Alert.alert('No Internet Connection', 'Please check your internet connection and try again.');
+      return;
+    }
+
     setLoading(true);
     try {
-      console.log('📝 Attempting to sign in...');
       const userCredential = await signInUser(email, password);
-      console.log('✅ Sign in successful:', userCredential.user.uid);
-      
-      // Check if user profile exists
-      console.log('📝 Checking user profile...');
       const userProfile = await getDocument(COLLECTIONS.USERS, userCredential.user.uid);
       
-      // Check if user is blocked
       if (userProfile && userProfile.blocked === true) {
-        console.log('❌ User account is blocked');
         await signOutUser();
         Alert.alert(
           'Account Blocked',
@@ -45,29 +50,26 @@ const LoginScreen = ({ navigation }) => {
       }
       
       if (userProfile && userProfile.displayName) {
-        console.log('✅ Profile exists, navigating to Main');
-        // Profile exists, go to main app
         navigation.replace('Main');
       } else {
-        console.log('⚠️ Profile not found, navigating to ProfileCreation');
-        // Profile not complete, go to profile creation
         navigation.replace('ProfileCreation', {
           userId: userCredential.user.uid,
           email: userCredential.user.email,
         });
       }
     } catch (error) {
-      console.error('Login Error:', error);
       let errorMessage = 'Login failed. Please try again.';
       
       if (error.code === 'auth/user-not-found') {
         errorMessage = 'No account found with this email.';
       } else if (error.code === 'auth/wrong-password') {
-        errorMessage = 'Incorrect password.';
+        errorMessage = 'Incorrect email or password.';
       } else if (error.code === 'auth/invalid-email') {
         errorMessage = 'Invalid email address.';
       } else if (error.code === 'auth/too-many-requests') {
         errorMessage = 'Too many failed attempts. Please try again later.';
+      } else if (error.code === 'auth/network-request-failed') {
+        errorMessage = 'Network error. Please check your internet connection.';
       } else if (error.message) {
         errorMessage = error.message;
       }
@@ -83,26 +85,24 @@ const LoginScreen = ({ navigation }) => {
   };
 
   const handleForgotPassword = () => {
-    console.log('handleForgotPassword called');
     if (navigation && navigation.navigate) {
       navigation.navigate('ForgotPassword');
-    } else {
-      console.error('Navigation not available');
     }
   };
 
   const handleGoogleLogin = async () => {
+    const isConnected = await checkInternetConnection();
+    if (!isConnected) {
+      Alert.alert('No Internet Connection', 'Please check your internet connection and try again.');
+      return;
+    }
+
     setGoogleLoading(true);
     try {
       const userCredential = await signInWithGoogle();
-      console.log('Google Sign-In Success:', userCredential.user);
-      
-      // Check if user profile exists and if user is blocked
       const userProfile = await getDocument(COLLECTIONS.USERS, userCredential.user.uid);
       
-      // Check if user is blocked
       if (userProfile && userProfile.blocked === true) {
-        console.log('❌ User account is blocked');
         await signOutUser();
         Alert.alert(
           'Account Blocked',
@@ -112,11 +112,13 @@ const LoginScreen = ({ navigation }) => {
         return;
       }
       
-      // Navigation will be handled by auth state listener in App.js
       navigation.replace('Main');
     } catch (error) {
-      console.error('Google Sign-In Error:', error);
       let errorMessage = 'Google Sign-In failed. Please try again.';
+      
+      if (error.message && error.message.includes('cancelled')) {
+        return;
+      }
       
       if (error.message) {
         errorMessage = error.message;
@@ -129,9 +131,7 @@ const LoginScreen = ({ navigation }) => {
   };
 
   const handleFacebookLogin = () => {
-    // Handle Facebook login logic here
     Alert.alert('Coming Soon', 'Facebook Sign-In will be available soon.');
-    console.log('Facebook Login');
   };
 
   return (
@@ -144,20 +144,17 @@ const LoginScreen = ({ navigation }) => {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Logo */}
         <Image
           source={require('../../assets/logo.png')}
           style={styles.logo}
           resizeMode="contain"
         />
 
-        {/* Title and Subtitle */}
         <View style={styles.titleContainer}>
           <Text style={styles.title}>Login</Text>
           <Text style={styles.subtitle}>Login and compete and get Fame.</Text>
         </View>
 
-        {/* Input Fields */}
         <View style={styles.inputContainer}>
           <CustomTextInput
             label="Email Address"
@@ -175,7 +172,6 @@ const LoginScreen = ({ navigation }) => {
           />
         </View>
 
-        {/* Social Login Buttons */}
         <View style={styles.socialContainer}>
           <SocialButton
             icon={
@@ -210,7 +206,6 @@ const LoginScreen = ({ navigation }) => {
           />
         </View>
 
-        {/* Login Button */}
         <CustomButton
           text={loading ? 'Logging in...' : 'Login'}
           onPress={handleLogin}
@@ -218,20 +213,17 @@ const LoginScreen = ({ navigation }) => {
           disabled={loading || googleLoading}
         />
 
-        {/* Sign Up Button */}
         <CustomButton
           text="Sign Up"
           onPress={handleSignUp}
           style={styles.signUpButton}
         />
 
-        {/* Forgot Password Link */}
         <TouchableOpacity onPress={handleForgotPassword} style={styles.forgotPasswordContainer}>
           <Text style={styles.forgotPasswordText}>Forget Password?</Text>
         </TouchableOpacity>
       </ScrollView>
 
-      {/* Loading Modal */}
       <LoadingModal visible={loading || googleLoading} />
     </KeyboardAvoidingView>
   );

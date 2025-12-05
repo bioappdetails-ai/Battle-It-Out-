@@ -113,3 +113,5 @@ Select Android → View credentials → The SHA-1 will be displayed there.
 - **SHA-1 must match** - The SHA-1 in `google-services.json` must match the keystore used to sign the app
 - **Multiple SHA-1s** - You can add multiple SHA-1 fingerprints in Firebase (useful for debug + release)
 
+
+

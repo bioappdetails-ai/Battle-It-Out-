@@ -24,15 +24,11 @@ function App() {
   useEffect(() => {
     // Register notification listeners
     notificationListener.current = Notifications.addNotificationReceivedListener((notification) => {
-      console.log('📬 Notification received:', notification);
     });
 
     responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
-      console.log('📬 Notification response:', response);
-      // Handle notification tap - navigate to appropriate screen
       const data = response.notification.request.content.data;
       if (data?.notificationId) {
-        // Navigation will be handled by the notification handler
       }
     });
 
@@ -50,7 +46,6 @@ function App() {
   useEffect(() => {
     if (user && user.uid) {
       registerPushToken(user.uid).catch((error) => {
-        console.error('Error registering push token:', error);
       });
 
       // Start online status tracking
@@ -110,7 +105,6 @@ function App() {
       // Auto-logout after inactivity
       const { signOutUser } = require('./services/authService');
       signOutUser().catch((error) => {
-        console.error('Error during auto-logout:', error);
       });
     }, INACTIVITY_TIMEOUT);
   };
